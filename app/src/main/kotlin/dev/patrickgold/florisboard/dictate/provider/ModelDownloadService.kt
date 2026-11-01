@@ -96,7 +96,9 @@ class ModelDownloadService : Service() {
         val active = states.values.filter { it.error == null }
         val single = active.singleOrNull()
         val title = if (single != null) {
-            val name = LocalModelCatalog.all.firstOrNull { it.id == single.modelId }?.displayName ?: single.modelId
+            val name = LocalModelCatalog.byId(single.modelId)?.displayName
+                ?: dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupModel.byIdOrNull(single.modelId)
+                    ?.displayName ?: single.modelId
             getString(R.string.dictate__local_model_notif_title).replace("{model}", name)
         } else {
             getString(R.string.dictate__local_model_notif_title_multi).replace("{count}", active.size.toString())

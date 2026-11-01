@@ -26,6 +26,19 @@ import kotlin.test.assertTrue
  */
 class LocalModelCatalogTest {
 
+    @Test
+    fun `Turbo uses the existing Whisper runtime and stays an optional family variant`() {
+        val spec = LocalModelCatalog.WHISPER_LARGE_V3_TURBO
+        assertEquals(spec, LocalModelCatalog.byId("whisper-large-v3-turbo-int8"))
+        assertEquals(LocalModelKind.WHISPER, spec.kind)
+        assertEquals(LocalModelFamily.WHISPER, spec.family)
+        assertTrue(spec.languages.containsAll(listOf("en", "ru")))
+        assertTrue(!spec.isStreaming && spec.splitsLongAudio && spec.maxSegmentSeconds == 28)
+        assertEquals(1_037_257_645L, spec.totalBytes)
+        assertTrue(spec !in LocalModelCatalog.onboardingPicks("en"))
+        assertTrue(spec !in LocalModelCatalog.onboardingPicks("ru"))
+    }
+
     private val encoder = LocalTranscriptionProvider.ENCODER
     private val decoder = LocalTranscriptionProvider.DECODER
     private val joiner = LocalTranscriptionProvider.JOINER
@@ -45,7 +58,9 @@ class LocalModelCatalogTest {
             )
         }
         for (spec in LocalModelCatalog.all) {
-            assertTrue(tokens in names(spec), "${spec.id} has no tokens file")
+            if (spec.kind != LocalModelKind.QWEN3_ASR) {
+                assertTrue(tokens in names(spec), "${spec.id} has no tokens file")
+            }
         }
     }
 
@@ -63,6 +78,14 @@ class LocalModelCatalogTest {
         for (spec in LocalModelCatalog.all) {
             val files = names(spec)
             when (spec.kind) {
+                LocalModelKind.QWEN3_ASR -> {
+                    assertTrue(encoder in files && decoder in files)
+                    assertTrue(LocalTranscriptionProvider.CONV_FRONTEND in files)
+                    assertTrue(files.containsAll(listOf(
+                        "tokenizer/vocab.json", "tokenizer/merges.txt", "tokenizer/tokenizer_config.json",
+                    )))
+                    assertTrue(tokens !in files && joiner !in files && model !in files)
+                }
                 LocalModelKind.WHISPER, LocalModelKind.CANARY -> {
                     assertTrue(encoder in files && decoder in files, "${spec.id} needs an encoder and a decoder")
                     assertTrue(model !in files, "${spec.id} is not a single-file model")
@@ -83,6 +106,25 @@ class LocalModelCatalogTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `Qwen is optional and its archive covers exactly the model files`() {
+        val spec = LocalModelCatalog.QWEN3_ASR_06B_INT8
+        assertEquals(LocalModelKind.QWEN3_ASR, LocalModelCatalog.kindOf(spec.id))
+        assertEquals(listOf("en", "ru"), spec.languages)
+        assertTrue(spec.detectsLanguage && spec.punctuates && !spec.isStreaming)
+        assertTrue(spec.maxSegmentSeconds <= 15)
+        assertTrue(spec !in LocalModelCatalog.onboardingPicks("en"))
+        assertTrue(spec !in LocalModelCatalog.onboardingPicks("ru"))
+        val archive = assertNotNull(spec.archive)
+        assertEquals(names(spec).filter { it != vad }.toSet(), archive.members.values.toSet())
+        assertEquals(archive.members.size, archive.members.values.toSet().size)
+        assertEquals(64, archive.sha256.length)
+        assertEquals(archive.sizeBytes + spec.files.single { it.destName == vad }.sizeBytes, spec.totalBytes)
+        assertTrue(LocalModelCatalog.visibleTopLevel(emptySet()).any {
+            it is LocalModelEntry.Single && it.spec == spec
+        })
     }
 
     @Test

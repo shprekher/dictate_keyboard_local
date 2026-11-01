@@ -28,7 +28,11 @@ CMAKE_VERSION="$(grep '^cmake ' "$REPO_ROOT/gradle/tools.versions.toml" | sed -E
 NDK="$SDK/ndk/$NDK_VERSION"
 CMAKE="$SDK/cmake/$CMAKE_VERSION/bin/cmake"
 NINJA="$SDK/cmake/$CMAKE_VERSION/bin/ninja"
-STRIP="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+case "$(uname -s)" in
+  Darwin) HOST=darwin-x86_64; CORES="$(sysctl -n hw.ncpu)" ;;
+  *) HOST=linux-x86_64; CORES="$(nproc)" ;;
+esac
+STRIP="$NDK/toolchains/llvm/prebuilt/$HOST/bin/llvm-strip"
 for tool in "$CMAKE" "$NINJA" "$STRIP"; do
   [ -x "$tool" ] || { echo "Missing $tool — install NDK $NDK_VERSION and CMake $CMAKE_VERSION via the SDK manager." >&2; exit 1; }
 done
@@ -102,7 +106,7 @@ for ABI in "${ABIS[@]}"; do
     -DSPM_ENABLE_TCMALLOC=OFF \
     -DUSE_TCMALLOC=OFF \
     -DCMAKE_CXX_FLAGS="-Wno-enum-constexpr-conversion"
-  "$NINJA" -C "$OUT" -j "$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 ))" dictate_bergamot
+  "$NINJA" -C "$OUT" -j "$(( CORES / 2 > 0 ? CORES / 2 : 1 ))" dictate_bergamot
 
   DEST="$REPO_ROOT/app/src/main/jniLibs/$ABI"
   mkdir -p "$DEST"

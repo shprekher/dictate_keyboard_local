@@ -63,11 +63,9 @@ import dev.patrickgold.florisboard.R
 import dev.patrickgold.florisboard.app.FlorisPreferenceStore
 import dev.patrickgold.florisboard.app.devtools.DevtoolsOverlay
 import dev.patrickgold.florisboard.dictate.DictateLegacyLayout
-import dev.patrickgold.florisboard.dictate.gif.GifPanel
 import dev.patrickgold.florisboard.dictate.scan.ScanPanel
 import dev.patrickgold.florisboard.dictate.sticker.StickerPanel
 import dev.patrickgold.florisboard.dictate.ui.DictateHistoryLayout
-import dev.patrickgold.florisboard.dictate.ui.DictateInputLayout
 import dev.patrickgold.florisboard.dictate.ui.LegacyDictateLayout
 import dev.patrickgold.florisboard.dictate.ui.LegacyLayoutState
 import dev.patrickgold.florisboard.dictate.ui.legacySwipeToggle
@@ -290,9 +288,8 @@ private fun ImeInnerWindow() {
                 }
                 ImeUiMode.MEDIA -> ProvideActualLayoutDirection { MediaInputLayout() }
                 ImeUiMode.CLIPBOARD -> ProvideActualLayoutDirection { ClipboardInputLayout() }
-                ImeUiMode.DICTATE -> ProvideActualLayoutDirection { DictateInputLayout() }
+                ImeUiMode.DICTATE -> ProvideActualLayoutDirection { TextInputLayout() }
                 ImeUiMode.HISTORY -> ProvideActualLayoutDirection { DictateHistoryLayout() }
-                ImeUiMode.GIF -> ProvideActualLayoutDirection { GifPanel() }
                 ImeUiMode.STICKER -> ProvideActualLayoutDirection { StickerPanel() }
                 // The cursor pad keeps the *actual* layout direction like every other panel: its arrows
                 // are auto-mirrored icons, so a right-to-left script gets a pad that points the way its

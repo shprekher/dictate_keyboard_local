@@ -22,7 +22,6 @@ import dev.patrickgold.florisboard.dictate.audio.AudioSpeedUp
 import dev.patrickgold.florisboard.dictate.audio.SpeechGate
 import dev.patrickgold.florisboard.dictate.dictateProxyConfig
 import dev.patrickgold.florisboard.dictate.provider.LocalTranscriptionProvider
-import dev.patrickgold.florisboard.dictate.provider.OpenAiCompatibleClient
 import dev.patrickgold.florisboard.dictate.provider.ProviderAccount
 import dev.patrickgold.florisboard.dictate.provider.ProviderRegistry
 import dev.patrickgold.florisboard.dictate.provider.TranscriptionApi
@@ -113,7 +112,7 @@ object ImportTranscriber {
         val appContext = context.applicationContext
         val account = accountFor(prefs)
         val preset = presetFor(account)
-        val onDevice = preset.transcriptionApi == TranscriptionApi.LOCAL_ONDEVICE
+        val onDevice = true
         val model = account.transcriptionModel.ifBlank { preset.defaultTranscriptionModel ?: "" }
 
         // Only announced when it is really about to happen: a short voice note has nothing to unpack,
@@ -251,44 +250,9 @@ object ImportTranscriber {
         language: String,
         onDevice: Boolean,
         onUpload: ((sent: Long, total: Long) -> Unit)?,
-    ): String {
-        // Time compression (issue #272), on the user's own setting and nothing else. It belongs here for
-        // the same reason it belongs in the keyboard — every provider bills by duration — except that an
-        // import is where the minutes actually add up: a dictation is a sentence, a shared recording is
-        // a meeting. It stays off unless it was switched on, because of the three ways this app shortens
-        // an upload it is the only one that changes what the model hears.
-        //
-        // Per piece rather than over the whole file: a piece is bounded by the upload limit, and this
-        // decodes what it is given into memory. On-device is skipped exactly as in the dictation path —
-        // nothing is billed there, and the trade would be accuracy for nothing.
-        val speedPercent = prefs.dictate.audioSpeedUpPercent.get()
-        val spedUp = if (!onDevice && speedPercent > AudioSpeedUp.MIN_PERCENT) {
-            AudioSpeedUp.process(
-                audio,
-                File(appContext.cacheDir, "spd_${audio.nameWithoutExtension}.wav"),
-                speedPercent / 100f,
-            )
-        } else {
-            null
-        }
-        val source = spedUp ?: audio
-        // The container the user brought is the whole point of this screen, so it is also where a
-        // provider is most likely to be handed something it does not take (issue #322). A slice this
-        // function made is already WAV and passes straight through; a file small enough to go up whole
-        // is whatever the sharing app wrote. On-device decodes anything and needs no conversion.
-        val converted = if (onDevice) null else {
-            AudioConvert.toAccepted(appContext.cacheDir, source, preset.acceptedAudioContainers)
-        }
-        try {
-            return transcribeFile(
-                appContext, prefs, account, preset, model, converted ?: source, language, onDevice, onUpload,
-            )
-        } finally {
-            converted?.let { runCatching { it.delete() } }
-            // Never the original: it is the caller's, and the history entry is made from it.
-            spedUp?.let { runCatching { it.delete() } }
-        }
-    }
+    ): String = transcribeFile(
+        appContext, prefs, account, preset, model, audio, language, onDevice, onUpload,
+    )
 
     private suspend fun transcribeFile(
         appContext: Context,
@@ -306,55 +270,24 @@ object ImportTranscriber {
             model = model,
             onUpload = onUpload,
             language = language.takeIf { it != DictateLanguages.DETECT },
-            // The same list-shaped hint the keyboard sends (#99), so an import left to detection is
-            // recognised among the languages the user actually speaks.
             expectedLanguages = DictateLanguages.expectedLanguages(
                 activeCode = language,
                 selectionRaw = prefs.dictate.inputLanguages.get(),
             ),
         )
-        return if (onDevice) {
-            LocalTranscriptionProvider(
-                LocalTranscriptionProvider.modelDir(appContext, model),
-                // Bounded like every other on-device decode (#354), on the same upwards-only terms as the
-                // cloud branch below: a piece of a shared file is a bigger job than a dictation, so the
-                // default two minutes would cut short work that is going perfectly well.
-                timeoutMillis = maxOf(
-                    IMPORT_CALL_TIMEOUT_SECONDS,
-                    prefs.dictate.requestTimeout.get().toLong(),
-                ) * 1000L,
-                tighteningSymbols = appContext.transcriptTighteningSymbols(),
-            ).transcribe(request).text.trim()
-        } else {
-            OpenAiCompatibleClient.from(
-                preset,
-                account.apiKey,
-                baseUrlOverride = if (account.isCustom || preset.allowsCustomBaseUrl) {
-                    account.customBaseUrl.takeIf { it.isNotBlank() }
-                } else null,
-                proxy = prefs.dictate.dictateProxyConfig(),
-                trustUserCerts = account.trustUserCerts,
-                // The user's own limit applies here too, but only upwards: someone who raised it for a
-                // slow machine of their own means it here as well, while the default two minutes is
-                // shorter than a file this size can honestly need.
-                timeoutSeconds = maxOf(
-                    IMPORT_OPERATION_TIMEOUT_SECONDS,
-                    prefs.dictate.requestTimeout.get().toLong(),
-                ),
-                callTimeoutSeconds = maxOf(
-                    IMPORT_CALL_TIMEOUT_SECONDS,
-                    prefs.dictate.requestTimeout.get().toLong(),
-                ),
-            ).transcribe(request).text.trim()
-        }
+        return LocalTranscriptionProvider(
+            LocalTranscriptionProvider.modelDir(appContext, model),
+            timeoutMillis = maxOf(
+                IMPORT_CALL_TIMEOUT_SECONDS,
+                prefs.dictate.requestTimeout.get().toLong(),
+            ) * 1000L,
+            tighteningSymbols = appContext.transcriptTighteningSymbols(),
+        ).transcribe(request).text.trim()
     }
 
     /** The provider this import uses: the one configured for transcription, like every other path. */
     fun accountFor(prefs: FlorisPreferenceModel): ProviderAccount =
-        prefs.dictate.providerAccounts.get().getOrEmpty(prefs.dictate.transcriptionProviderId.get())
+        prefs.dictate.providerAccounts.get().getOrEmpty(ProviderRegistry.LOCAL.id)
 
-    fun presetFor(account: ProviderAccount) = when {
-        account.isCustom -> ProviderRegistry.custom(account.customBaseUrl, realtime = account.customRealtime)
-        else -> ProviderRegistry.byId(account.providerId) ?: ProviderRegistry.OPENAI
-    }
+    fun presetFor(account: ProviderAccount) = ProviderRegistry.LOCAL
 }

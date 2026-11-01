@@ -62,45 +62,10 @@ fun ImportExtensionBox(navController: NavController) {
         ) {
             FlorisTextButton(
                 onClick = {
-                    context.launchUrl("https://${BuildConfig.FLADDONS_STORE_URL}/")
-                },
-                icon = Icons.Default.Shop,
-                text = stringRes(id = R.string.ext__home__visit_store),
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            FlorisTextButton(
-                onClick = {
                     navController.navigate(Routes.Ext.Import(ExtensionImportScreenType.EXT_ANY, null))
                 },
                 icon = Icons.AutoMirrored.Filled.Input,
                 text = stringRes(R.string.action__import),
-            )
-        }
-    }
-}
-
-@Composable
-fun UpdateBox(extensionIndex: List<Extension>) {
-    val context = LocalContext.current
-    FlorisOutlinedBox(
-        modifier = Modifier.defaultFlorisOutlinedBox(),
-    ) {
-        Text(
-            modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 4.dp),
-            text = stringRes(id = R.string.ext__update_box__internet_permission_hint),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp),
-        ) {
-            FlorisTextButton(
-                onClick = {
-                    context.launchUrl(extensionIndex.generateUpdateUrl())
-                },
-                icon = Icons.Outlined.FileDownload,
-                text = stringRes(id = R.string.ext__update_box__search_for_updates)
             )
             Spacer(modifier = Modifier.weight(1f))
         }

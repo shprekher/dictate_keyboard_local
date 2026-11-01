@@ -31,7 +31,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.patrickgold.florisboard.app.FlorisPreferenceStore
-import dev.patrickgold.florisboard.dictate.DictatePromptsLayout
+
 import dev.patrickgold.florisboard.ime.media.emoji.emojiRowVisible
 import dev.patrickgold.florisboard.ime.nlp.NlpInlineAutofill
 import dev.patrickgold.florisboard.ime.smartbar.ExtendedActionsPlacement
@@ -138,30 +138,19 @@ object FlorisImeSizing {
      * clipboard, history). [keyboardUiHeight] derives its row count from the currently active evaluator,
      * which for a panel can differ from the typing keyboard and make the panel a different height — so it
      * visibly jumps when opened. Basing it on the last characters keyboard (like [rowCountAsState]) keeps a
-     * panel exactly as tall as the keyboard it replaces, including the always-on rewording prompt row when
-     * that's enabled (the panels replace it too, so its height must be counted).
+     * panel exactly as tall as the keyboard it replaces.
      */
     @Composable
     fun panelUiHeight(): Dp {
-        val prefs by FlorisPreferenceStore
         val rowCount by rowCountAsState()
-        val smartbarEnabled by prefs.smartbar.enabled.collectAsState()
-        val rewordingEnabled by prefs.dictate.rewordingEnabled.collectAsState()
-        val promptsLayout by prefs.dictate.promptsLayout.collectAsState()
-        // The rewording prompt row (ROW layout) is pinned above the Smartbar on the normal keyboard and
-        // adds its height (DictatePromptRow uses smartbarHeight * 1.25); include it so the panels match.
-        val promptRowHeight =
-            if (smartbarEnabled && rewordingEnabled && promptsLayout == DictatePromptsLayout.ROW) {
-                smartbarHeight * 1.25f
-            } else {
-                0.dp
-            }
+        // The removed always-on prompt row no longer contributes height; panels match the Smartbar and
+        // the recent-emoji row only.
         // Same reasoning for the recent-emoji row (#340), which sits below the Smartbar and is one
         // [smartbarHeight] tall. Asked through the very predicate the row itself uses, so the two can
         // never disagree — a panel one row off is a keyboard that jumps when it opens.
         val emojiRowHeight = if (emojiRowVisible()) smartbarHeight else 0.dp
         return keyboardRowBaseHeight * rowCount.coerceAtLeast(4) + smartbarUiHeight() +
-            promptRowHeight + emojiRowHeight
+            emojiRowHeight
     }
 }
 

@@ -45,7 +45,6 @@ fun ExtensionHomeScreen() = FlorisScreen {
     content {
         ImportExtensionBox(navController)
 
-        UpdateBox(extensionIndex = extensionIndex)
 
         Preference(
             icon = Icons.Default.Palette,

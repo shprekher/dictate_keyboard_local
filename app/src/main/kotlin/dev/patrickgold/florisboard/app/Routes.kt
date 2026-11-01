@@ -41,7 +41,6 @@ import dev.patrickgold.florisboard.app.devtools.AndroidSettingsScreen
 import dev.patrickgold.florisboard.app.devtools.DevtoolsScreen
 import dev.patrickgold.florisboard.app.devtools.ExportDebugLogScreen
 import dev.patrickgold.florisboard.app.settings.translation.TranslationScreen
-import dev.patrickgold.florisboard.app.ext.CheckUpdatesScreen
 import dev.patrickgold.florisboard.app.ext.ExtensionEditScreen
 import dev.patrickgold.florisboard.app.ext.ExtensionExportScreen
 import dev.patrickgold.florisboard.app.ext.ExtensionHomeScreen
@@ -63,20 +62,14 @@ import dev.patrickgold.florisboard.app.settings.advanced.RestoreScreen
 import dev.patrickgold.florisboard.app.settings.clipboard.ClipboardScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateLanguagesScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateMappingsScreen
-import dev.patrickgold.florisboard.app.settings.dictate.DictateCloudScreen
-import dev.patrickgold.florisboard.app.settings.dictate.DictateAddProviderScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateProvidersScreen
-import dev.patrickgold.florisboard.app.settings.dictate.DictateProxyScreen
-import dev.patrickgold.florisboard.app.settings.dictate.DictateWearScreen
-import dev.patrickgold.florisboard.app.settings.dictate.DictatePromptLibraryScreen
-import dev.patrickgold.florisboard.app.settings.dictate.DictatePromptsScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateFloatingButtonAppsScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateFloatingButtonScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateFormattingScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateLayoutScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateOutputScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateRecordingScreen
-import dev.patrickgold.florisboard.app.settings.dictate.DictateRewordingScreen
+import dev.patrickgold.florisboard.app.settings.dictate.DictateCleanupScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateHistoryScreen
 import dev.patrickgold.florisboard.app.settings.dictate.DictateStatsScreen
@@ -150,28 +143,16 @@ object Routes {
         object DictateProviders
 
         @Serializable
-        @Deeplink("settings/dictate/providers/add")
-        object DictateProvidersAdd
-
-        @Serializable
         @Deeplink("settings/dictate/mappings")
         object DictateMappings
 
         @Serializable
-        @Deeplink("settings/dictate/cloud")
-        object DictateCloud
-
-        @Serializable
-        @Deeplink("settings/dictate/proxy")
-        object DictateProxy
-
-        @Serializable
-        @Deeplink("settings/dictate/wear")
-        object DictateWear
-
-        @Serializable
         @Deeplink("settings/dictate/rewording")
         object DictateRewording
+
+        @Serializable
+        @Deeplink("settings/dictate/cleanup")
+        object DictateCleanup
 
         @Serializable
         @Deeplink("settings/dictate/stats")
@@ -369,10 +350,6 @@ object Routes {
         @Serializable
         @Deeplink("ext/view")
         data class View(val id: String)
-
-        @Serializable
-        @Deeplink("ext/check-updates")
-        object CheckUpdates
     }
 
     @Composable
@@ -407,12 +384,10 @@ object Routes {
             composableWithDeepLink(Settings.Dictate::class) { DictateScreen() }
             composableWithDeepLink(Settings.DictateLanguages::class) { DictateLanguagesScreen() }
             composableWithDeepLink(Settings.DictateProviders::class) { DictateProvidersScreen() }
-            composableWithDeepLink(Settings.DictateProvidersAdd::class) { DictateAddProviderScreen() }
             composableWithDeepLink(Settings.DictateMappings::class) { DictateMappingsScreen() }
-            composableWithDeepLink(Settings.DictateCloud::class) { DictateCloudScreen() }
-            composableWithDeepLink(Settings.DictateProxy::class) { DictateProxyScreen() }
-            composableWithDeepLink(Settings.DictateWear::class) { DictateWearScreen() }
-            composableWithDeepLink(Settings.DictateRewording::class) { DictateRewordingScreen() }
+            composableWithDeepLink(Settings.DictateCleanup::class) { DictateCleanupScreen() }
+            // Old links now open cleanup settings, never the retired rewording workflow.
+            composableWithDeepLink(Settings.DictateRewording::class) { DictateCleanupScreen() }
             composableWithDeepLink(Settings.DictateFormatting::class) { DictateFormattingScreen() }
             composableWithDeepLink(Settings.DictateRecording::class) { DictateRecordingScreen() }
             composableWithDeepLink(Settings.DictateOutput::class) { DictateOutputScreen() }
@@ -421,11 +396,8 @@ object Routes {
             composableWithDeepLink(Settings.DictateHistory::class) { DictateHistoryScreen() }
             composableWithDeepLink(Settings.DictateFloatingButton::class) { DictateFloatingButtonScreen() }
             composableWithDeepLink(Settings.DictateFloatingButtonApps::class) { DictateFloatingButtonAppsScreen() }
-            composableWithDeepLink(Settings.DictatePrompts::class) { navBackStack ->
-                val payload = navBackStack.toRoute<Settings.DictatePrompts>()
-                DictatePromptsScreen(editPromptId = payload.editPromptId)
-            }
-            composableWithDeepLink(Settings.DictatePromptLibrary::class) { DictatePromptLibraryScreen() }
+            composableWithDeepLink(Settings.DictatePrompts::class) { DictateCleanupScreen() }
+            composableWithDeepLink(Settings.DictatePromptLibrary::class) { DictateCleanupScreen() }
 
             composableWithDeepLink(Settings.Localization::class) { LocalizationScreen() }
             composableWithDeepLink(Settings.SelectLocale::class) { SelectLocaleScreen() }
@@ -515,9 +487,6 @@ object Routes {
                 val payload = navBackStack.toRoute<Ext.View>()
                 val extensionId = payload.id
                 ExtensionViewScreen(id = extensionId)
-            }
-            composableWithDeepLink(Ext.CheckUpdates::class) {
-                CheckUpdatesScreen()
             }
         }
     }

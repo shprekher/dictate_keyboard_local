@@ -33,11 +33,10 @@ import dev.patrickgold.florisboard.dictate.provider.ProviderRegistry
 import dev.patrickgold.florisboard.dictate.DictateFloatingButtonSize
 import dev.patrickgold.florisboard.dictate.DictateLegacyLayout
 import dev.patrickgold.florisboard.dictate.DictatePromptsLayout
+import dev.patrickgold.florisboard.dictate.data.prompts.DictatePromptDefaults
 import dev.patrickgold.florisboard.dictate.DictateRecordingAnimation
 import dev.patrickgold.florisboard.dictate.DictateReasoningEffort
 import dev.patrickgold.florisboard.dictate.data.mappings.DictateMappings
-import dev.patrickgold.florisboard.dictate.gif.GifContentFilter
-import dev.patrickgold.florisboard.dictate.gif.GifHistory
 import dev.patrickgold.florisboard.dictate.overlay.BubbleAnchors
 import dev.patrickgold.florisboard.dictate.overlay.BubbleApps
 import dev.patrickgold.florisboard.dictate.provider.DictateProxyType
@@ -841,7 +840,7 @@ abstract class FlorisPreferenceModel : PreferenceModel() {
             default = 0L,
         )
         // --- Lifetime dictation statistics (issue #142) ------------------------------------------
-        // Never auto-reset (unlike totalAudioSeconds below, which the rate nudge clears); only the user
+        // Never auto-reset; only the user
         // can reset them from the stats screen. Updated centrally after each successful dictation.
         val statsDictations = long(key = "dictate__stats_dictations", default = 0L)
         val statsWords = long(key = "dictate__stats_words", default = 0L)
@@ -864,40 +863,6 @@ abstract class FlorisPreferenceModel : PreferenceModel() {
         // A crossed-but-not-yet-shown milestone, consumed on next app open: "time:<min>" | "count:<n>".
         val statsPendingMilestone = string(key = "dictate__stats_pending_milestone", default = "")
 
-        // --- Rate / Donate nudges (roadmap 9.7/9.8) ----------------------------------------------
-        // Cumulative seconds of successfully transcribed *recorded* audio, used to gate the one-time
-        // rate/donate prompts. Replaces the legacy usage DB (which was dropped); only this counter
-        // remains. Incremented after each successful mic transcription.
-        val totalAudioSeconds = long(
-            key = "dictate__total_audio_seconds",
-            default = 0L,
-        )
-        // Set once the user has acted on the rate prompt (accepted or declined), so it never reappears.
-        val hasRated = boolean(
-            key = "dictate__has_rated",
-            default = false,
-        )
-        // Set once the user has acted on the donate prompt; accepting/declining donate also sets
-        // hasRated, so a donor is never asked to rate afterwards (mirrors the legacy behavior).
-        val hasDonated = boolean(
-            key = "dictate__has_donated",
-            default = false,
-        )
-        // Set once the "credit is running low" nudge has been shown, so it appears once per
-        // depletion rather than on every keyboard open. Cleared again the moment a purchase credits
-        // the wallet (see DictateCloud.store), which makes one nudge per refill cycle.
-        val cloudLowCreditNudged = boolean(
-            key = "dictate__cloud_low_credit_nudged",
-            default = false,
-        )
-        // The app version whose "Dictate was updated" changelog nudge has already been shown on the
-        // keyboard (Smartbar). Set when the user taps or dismisses that nudge, so it appears only once
-        // per update. Empty until the first post-update nudge. Independent of the in-app dialog's
-        // versionLastChangelog bookkeeping, so the two surfaces never suppress each other.
-        val changelogNudgeVersion = string(
-            key = "dictate__changelog_nudge_version",
-            default = "",
-        )
         // Comma-separated dictation language codes the user cycles through on the recording bar
         // (see DictateLanguages; "detect" = auto-detect). Default mirrors the legacy app.
         val inputLanguages = string(
@@ -958,22 +923,21 @@ abstract class FlorisPreferenceModel : PreferenceModel() {
             key = "dictate__prompts_layout_row_migrated",
             default = false,
         )
-        // Guard for the one-time re-engagement reset shipped with the 4.0.0 relaunch: existing users
-        // (who had already rated/donated, or whose audio counter was long past the thresholds) are
-        // given the rate & donate nudges one more time so they can react to the new app. Clears
-        // hasRated/hasDonated and resets totalAudioSeconds exactly once. See
-        // DictateLegacyMigrator.reofferRateAndDonateIfNeeded.
-        val promoReengagementDone = boolean(
-            key = "dictate__promo_reengagement_done",
-            default = false,
-        )
-
         // --- Rewording / GPT (roadmap section 4) -------------------------------------------------
         // Master switch for the rewording feature (prompt chips, auto-apply, live prompt). Default
         // on, mirroring the legacy app.
-        val rewordingEnabled = boolean(
+        // Keep the old key so existing installations retain their on/off choice.
+        val cleanupEnabled = boolean(
             key = "dictate__rewording_enabled",
             default = true,
+        )
+        val cleanupPromptSelection = int(
+            key = "dictate__cleanup_prompt_selection",
+            default = DictatePromptDefaults.SELECTION_PREDEFINED,
+        )
+        val cleanupPromptCustom = string(
+            key = "dictate__cleanup_prompt_custom",
+            default = "",
         )
         // The spoken command word (issue #139): a dictation opening with it runs as a live prompt
         // instead of being inserted. Blank (the default) switches the whole recognition off — there is
@@ -1183,34 +1147,6 @@ abstract class FlorisPreferenceModel : PreferenceModel() {
         val suggestionCandidateMaxCount = int(
             key = "emoji__suggestion_candidate_max_count",
             default = 5,
-        )
-    }
-
-    val gif = Gif()
-    inner class Gif {
-        val enabled = boolean(
-            key = "gif__enabled",
-            default = false,
-        )
-        // Bring-your-own KLIPY API key (see KlipyGifProvider). Empty = GIF search disabled.
-        val klipyApiKey = string(
-            key = "gif__klipy_api_key",
-            default = "",
-        )
-        val contentFilter = enum(
-            key = "gif__content_filter",
-            default = GifContentFilter.HIGH,
-        )
-        // Stable per-install id sent to KLIPY for relevance/localization (generated on first use).
-        val customerId = string(
-            key = "gif__customer_id",
-            default = "",
-        )
-        // Recently searched terms + recently inserted GIFs, for quick re-access.
-        val history = custom(
-            key = "gif__history",
-            default = GifHistory.Empty,
-            serializer = GifHistory.Serializer,
         )
     }
 

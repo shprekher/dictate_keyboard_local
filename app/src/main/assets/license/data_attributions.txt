@@ -46,7 +46,7 @@ Downloaded on demand into <filesDir>/dictate-models/<model>/ ; no audio ever lea
 
 One-shot models — these transcribe after you stop speaking:
 
-  - Whisper (tiny/base/small, multilingual and English) — © OpenAI, MIT License.
+  - Whisper (tiny/base/small, multilingual and English, plus Large-v3-Turbo) — © OpenAI, MIT License.
     https://github.com/openai/whisper
   - Parakeet Ultra — a post-train of NVIDIA Parakeet TDT 0.6B v3 covering the same 25 European
     languages, © moondream, licensed CC BY 4.0. https://huggingface.co/moondream/parakeet-ultra
@@ -72,6 +72,10 @@ One-shot models — these transcribe after you stop speaking:
     https://github.com/FunAudioLLM/SenseVoice
     License text: https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE
     Redistributed unmodified, under its own name.
+  - Qwen3-ASR 0.6B INT8 — © Qwen Team / Alibaba Cloud, Apache-2.0.
+    https://github.com/QwenLM/Qwen3-ASR
+    ONNX conversion by Wasser1462: https://github.com/Wasser1462/Qwen3-ASR-onnx
+    Downloaded unmodified from the sherpa-onnx upstream asr-models release.
 
 Streaming models — these transcribe live, while you are still speaking:
 
@@ -88,6 +92,14 @@ Streaming models — these transcribe live, while you are still speaking:
     © Silero Team, MIT License. https://github.com/snakers4/silero-vad
   - Smart Turn v3 — decides whether a spoken thought is finished, for long-form auto-split.
     © Pipecat AI, licensed BSD-2-Clause. https://github.com/pipecat-ai/smart-turn
+  - Qwen3 1.7B Q4_K_M and Qwen3 0.6B Q4_K_M — optional English/Russian text cleanup for
+    dictation transcripts. © Qwen Team / Alibaba Cloud, Apache-2.0.
+    https://huggingface.co/Qwen/Qwen3-1.7B · https://huggingface.co/Qwen/Qwen3-0.6B
+    GGUF quantization by Unsloth:
+    https://huggingface.co/unsloth/Qwen3-1.7B-GGUF · https://huggingface.co/unsloth/Qwen3-0.6B-GGUF
+  - Qwen3.5 0.8B GEC Q4_0 — optional English/Russian/Kazakh grammar and spelling cleanup.
+    © Loqira Labs / Qwen Team, Apache-2.0.
+    https://huggingface.co/loqira/Qwen3.5-0.8B-GEC-KAZ-RUS-ENG
 
 5. Model runtime and conversions
 ---------------------------------
@@ -96,8 +108,11 @@ The ONNX (int8) exports of every model above, and the on-device inference runtim
 sherpa-onnx / k2-fsa project, Apache-2.0. https://github.com/k2-fsa/sherpa-onnx
 Inference runs through ONNX Runtime, © Microsoft, MIT License. https://onnxruntime.ai
 
-All of the above permit redistribution; the files are mirrored on the project's own GitHub release
-for a stable, project-controlled source.
+The local text-cleanup engine is llama.cpp, © The ggml authors, MIT License.
+https://github.com/ggml-org/llama.cpp
+
+All of the above permit redistribution; except for Qwen3-ASR's upstream archive, the files are
+mirrored on the project's own GitHub release for a stable, project-controlled source.
 
 6. Emoji names and keywords (emoji search, emoji suggestions)
 -------------------------------------------------------------
@@ -180,4 +195,3 @@ from English only, so a pair of two other languages is translated through Englis
     tools/bergamot/patches in the Dictate repository). https://github.com/google/sentencepiece
   - ruy, © Google, Apache License 2.0; cpuinfo, BSD 2-Clause; simd_utils, BSD 2-Clause;
     PCRE2, BSD 3-Clause; yaml-cpp and pathie-cpp, MIT / BSD 2-Clause; ssplit-cpp, Apache License 2.0.
-

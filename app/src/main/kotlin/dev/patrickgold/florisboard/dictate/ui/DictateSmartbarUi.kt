@@ -166,7 +166,6 @@ fun DictateSmartbarUi(state: DictateController.UiState, modifier: Modifier = Mod
             is DictateController.UiState.Rewording -> RewordingContent(state)
             is DictateController.UiState.Error -> ErrorContent(state)
             is DictateController.UiState.Interrupted -> InterruptedContent(state)
-            is DictateController.UiState.Promo -> PromoContent(state.kind, state.message)
             else -> {}
         }
     }
@@ -612,7 +611,7 @@ private fun RewordingContent(state: DictateController.UiState.Rewording) {
             .rotate(rotation),
     )
     Spacer(modifier = Modifier.width(10.dp))
-    SnyggText(text = state.label.ifBlank { stringRes(R.string.dictate__status_rewording) })
+    SnyggText(text = state.label.ifBlank { stringRes(R.string.dictate__local_cleanup_running) })
 }
 
 /**
@@ -686,19 +685,6 @@ private fun RowScope.ErrorContent(state: DictateController.UiState.Error) {
                 SnyggIcon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = stringRes(R.string.dictate__action_settings),
-                )
-            }
-            DismissButton()
-        }
-        DictateController.ErrorAction.TOP_UP -> {
-            SnyggIconButton(
-                elementName = FlorisImeUi.SmartbarActionKey.elementName,
-                onClick = { DictateController.openCloudSettings(context) },
-                modifier = Modifier.fillMaxHeight().aspectRatio(1f),
-            ) {
-                SnyggIcon(
-                    imageVector = Icons.Default.AddCard,
-                    contentDescription = stringRes(R.string.dictate__action_top_up),
                 )
             }
             DismissButton()
@@ -872,9 +858,7 @@ private fun errorIcon(
     // A stopped transcription with its recording kept (#437): the glyph of the interrupted-recording chip,
     // the other offer of a kept recording, rather than a warning sign over something the user chose.
     neutral && action == DictateController.ErrorAction.RESEND -> Icons.Default.GraphicEq
-    action == DictateController.ErrorAction.TOP_UP -> Icons.Default.AddCard
     action == DictateController.ErrorAction.OPEN_SETTINGS -> Icons.Default.VpnKey
-    kind == DictateApiException.Kind.QUOTA_EXCEEDED -> Icons.Default.DataUsage
     kind == DictateApiException.Kind.CONTENT_SIZE_LIMIT -> Icons.Default.WarningAmber
     kind == DictateApiException.Kind.TEXT_SIZE_LIMIT -> Icons.Default.WarningAmber
     kind == DictateApiException.Kind.FORMAT_NOT_SUPPORTED -> Icons.Default.GraphicEq
@@ -890,111 +874,6 @@ private fun errorIcon(
  * (changelog after an update, 11.9); both buttons mark the nudge as handled so it never reappears.
  * Shown only when idle, replacing the normal Smartbar.
  */
-@Composable
-private fun PromoContent(kind: DictateController.PromoKind, message: String? = null) {
-    val context = LocalContext.current
-    val prefs by FlorisPreferenceStore
-    val rowStyle = rememberSnyggThemeQuery(FlorisImeUi.SmartbarSharedActionsRow.elementName)
-    val accent by prefs.theme.accentColor.collectAsState() // follows the user's keyboard accent.
-    val leadingIcon = when (kind) {
-        DictateController.PromoKind.RATE -> Icons.Default.Star
-        DictateController.PromoKind.DONATE -> Icons.Default.Favorite
-        DictateController.PromoKind.CHANGELOG -> Icons.Default.NewReleases
-        DictateController.PromoKind.FLOATING_BUTTON -> Icons.Default.Adjust
-        DictateController.PromoKind.MILESTONE -> Icons.Default.EmojiEvents
-        // The mark of what is running low, not of the action — the accent pill beside it already
-        // says "top up".
-        DictateController.PromoKind.LOW_CREDIT -> ImageVector.vectorResource(R.drawable.ic_dictate_cloud)
-    }
-    // Milestone text is dynamic (which milestone), so it arrives via [message]; the rest map to a res.
-    val messageRes = when (kind) {
-        DictateController.PromoKind.RATE -> R.string.dictate__promo_rate_message
-        DictateController.PromoKind.DONATE -> R.string.dictate__promo_donate_message
-        DictateController.PromoKind.CHANGELOG -> R.string.dictate__promo_changelog_message
-        DictateController.PromoKind.FLOATING_BUTTON -> R.string.dictate__promo_floating_button_message
-        DictateController.PromoKind.MILESTONE -> R.string.dictate__stats_milestone_title
-        DictateController.PromoKind.LOW_CREDIT -> R.string.dictate__promo_low_credit_message
-    }
-    val actionRes = when (kind) {
-        DictateController.PromoKind.RATE -> R.string.dictate__promo_rate_action
-        DictateController.PromoKind.DONATE -> R.string.dictate__promo_donate_action
-        DictateController.PromoKind.CHANGELOG -> R.string.dictate__promo_changelog_action
-        DictateController.PromoKind.FLOATING_BUTTON -> R.string.dictate__promo_floating_button_action
-        DictateController.PromoKind.MILESTONE -> R.string.dictate__promo_milestone_action
-        DictateController.PromoKind.LOW_CREDIT -> R.string.dictate__promo_low_credit_action
-    }
-
-    // Gentle pop-in (fade + slight scale) on top of the Smartbar's own slide transition.
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val appear by animateFloatAsState(
-        targetValue = if (shown) 1f else 0f,
-        animationSpec = tween(220),
-        label = "promoAppear",
-    )
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxHeight()
-            .padding(horizontal = 4.dp)
-            .graphicsLayer {
-                alpha = appear
-                val s = 0.92f + 0.08f * appear
-                scaleX = s
-                scaleY = s
-            },
-    ) {
-        // Tinted leading icon (star = rate, heart = donate, badge = update/changelog).
-        Icon(
-            imageVector = leadingIcon,
-            contentDescription = null,
-            tint = accent,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        // Plain Text (not SnyggText) constrained with weight + single line + ellipsis: long localized
-        // messages (e.g. German "Dictate unterstützen?") must shrink/ellipsize instead of wrapping and
-        // pushing the accept/dismiss controls off-screen, which would leave the nudge un-dismissable.
-        // fill = false keeps the row compact and centered for short locales.
-        Text(
-            text = message ?: stringRes(messageRes),
-            color = rowStyle.foreground(),
-            fontSize = 14.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        // Filled accent pill = primary action (opens Play Store / PayPal / the in-app changelog).
-        Text(
-            text = stringRes(actionRes),
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            modifier = Modifier
-                .clip(RoundedCornerShape(percent = 50))
-                .background(accent)
-                .clickable { DictateController.acceptPromo(context) }
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-        )
-        Spacer(modifier = Modifier.width(2.dp))
-        // Subtle dismiss.
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable { DictateController.declinePromo() }
-                .padding(6.dp),
-        ) {
-            SnyggIcon(
-                imageVector = Icons.Default.Close,
-                contentDescription = stringRes(R.string.dictate__action_no),
-                modifier = Modifier.size(18.dp).alpha(0.6f),
-            )
-        }
-    }
-}
-
 private fun formatElapsed(ms: Long): String {
     val totalSec = (ms / 1000L).coerceAtLeast(0L)
     return "%d:%02d".format(totalSec / 60L, totalSec % 60L)

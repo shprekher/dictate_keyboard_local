@@ -28,7 +28,7 @@ object ProviderListing {
      * else. Dictate Cloud is bought inside the app and the on-device engine needs only a download, so
      * hiding them until they were set up would hide them from exactly the people they are for.
      */
-    val pinnedIds: Set<String> = setOf(ProviderRegistry.LOCAL.id, ProviderRegistry.CLOUD.id)
+    val pinnedIds: Set<String> = setOf(ProviderRegistry.LOCAL.id, ProviderRegistry.LOCAL_CLEANUP.id)
 
     /**
      * Whether [preset] can be used right now.
@@ -46,6 +46,9 @@ object ProviderListing {
         accounts: ProviderAccounts,
         isModelInstalled: (String) -> Boolean,
     ): Boolean {
+        if (preset.id == ProviderRegistry.LOCAL_CLEANUP.id) {
+            return preset.curatedChatModels.any { it.isNotBlank() && isModelInstalled(it) }
+        }
         if (preset.transcriptionApi == TranscriptionApi.LOCAL_ONDEVICE) {
             val account = accounts.getOrEmpty(preset.id)
             val oneShot = account.transcriptionModel.ifBlank { preset.defaultTranscriptionModel.orEmpty() }
@@ -99,10 +102,6 @@ object ProviderListing {
             .filter { isPickable(it, accounts, selectedId, isModelInstalled) }
             .sortedByDescending { it.transcriptionApi == TranscriptionApi.LOCAL_ONDEVICE }
             .forEach { add(it.id to it.displayName) }
-        accounts.accounts.values
-            .filter { it.isCustom }
-            .sortedBy { it.displayName.lowercase() }
-            .forEach { add(it.providerId to customLabel(it)) }
     }
 
     /**

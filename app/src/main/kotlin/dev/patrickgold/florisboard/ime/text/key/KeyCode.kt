@@ -102,8 +102,6 @@ object KeyCode {
     const val DICTATE_PROMPTS =             -216
     // Dictate: re-insert the last successful dictation (safety net after a field clear, e.g. rotation).
     const val DICTATE_REINSERT =            -217
-    // Opens the GIF search panel (KLIPY).
-    const val IME_UI_MODE_GIF =             -218
     // Opens the local sticker panel (a folder the user picked, issue #280).
     const val IME_UI_MODE_STICKER =         -219
     // Opens the text editing panel: cursor pad, select toggle, clipboard actions (issue #386).

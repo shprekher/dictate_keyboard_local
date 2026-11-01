@@ -16,6 +16,7 @@ androidx-wear-compose = "1.4.1"
 androidx-window = "1.5.1"
 cache4k = "0.14.0"
 coil = "3.4.0"
+commons-compress = "1.28.0"
 kotlin = "2.3.20"
 android-billing = "8.3.0"
 kotlinx-coroutines = "1.10.2"
@@ -70,6 +71,7 @@ cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
 kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "kotlinx-coroutines" }

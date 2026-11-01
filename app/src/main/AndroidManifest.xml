@@ -5,10 +5,6 @@
     <!-- Permission needed to vibrate if the user has key press vibration enabled -->
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- Buying credit packs for Dictate Cloud. The billing library declares this itself, but
-         stating it here keeps it visible: without it in the uploaded build, the Play Console
-         will not let in-app products be created at all. -->
-    <uses-permission android:name="com.android.vending.BILLING"/>
 
     <!-- Permission needed to record audio for Dictate voice transcription -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
@@ -115,27 +111,6 @@
             </intent-filter>
             <meta-data android:name="android.view.textservice.scs" android:resource="@xml/spellchecker"/>
         </service>
-
-        <!-- Wear OS Data Layer endpoint (#106): answers settings-sync requests from the watch app. -->
-        <service
-            android:name="dev.patrickgold.florisboard.dictate.wear.DictateWearService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-                <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:pathPrefix="/dictate" />
-            </intent-filter>
-        </service>
-
-        <!-- Keeps the process from being frozen while it transcribes for the watch (issue #363). A short
-             service needs no permission beyond FOREGROUND_SERVICE and no Play Console declaration. -->
-        <service
-            android:name="dev.patrickgold.florisboard.dictate.wear.WearTetherService"
-            android:foregroundServiceType="shortService"
-            android:exported="false"/>
 
         <!-- Keeps on-device model downloads running when the app is left (issue #207); shows an ongoing
              progress notification. Not exported: only started internally by LocalModelDownloads. -->

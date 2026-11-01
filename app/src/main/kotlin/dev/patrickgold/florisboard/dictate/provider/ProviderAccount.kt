@@ -137,9 +137,7 @@ data class ProviderAccount(
      * dictated through it.
      */
     val requiresCredential: Boolean
-        get() = !isCustom &&
-            (ProviderRegistry.byId(providerId)?.apiKeyUrl != null ||
-                providerId == ProviderRegistry.CLOUD.id)
+        get() = false
 
     companion object {
         const val CUSTOM_PREFIX = "custom:"
@@ -222,23 +220,6 @@ val ProviderAccounts.hasNoSecrets: Boolean
     get() = accounts.isNotEmpty() && accounts.values.none { it.hasAnySecret }
 
 /**
- * Whether a dictation can go out as a single `chat/completions` request with the audio in it (#130).
- *
- * A **routing** question, not a judgement about what a model is good at: the on-device engine has no
- * chat endpoint at all, and Google's dedicated speech-to-text models answer on their own endpoint
- * (#292), so neither can be posted to. Everything else is offered, and whether the model actually
- * accepts audio is the user's business — see [sharedSingleCallModel].
- *
- * Read only by the dictation path. The settings dialog folds its fields on the switch alone, and the
- * rewording model follows the field the user can see; having this decide those too is what left the
- * switch looking broken (#313).
- */
-fun singleCallApplies(transcriptionViaChat: Boolean, preset: ProviderPreset, model: String): Boolean =
-    transcriptionViaChat &&
-        preset.transcriptionApi != TranscriptionApi.LOCAL_ONDEVICE &&
-        !(preset.id == ProviderRegistry.GEMINI.id && ProviderRegistry.isGeminiTranscribeModel(model))
-
-/**
  * The model to reword with for [account] — the one the settings dialog says will be used, which is not
  * always the one [ProviderAccount.chatModel] holds (issue #313).
  *
@@ -253,8 +234,11 @@ fun singleCallApplies(transcriptionViaChat: Boolean, preset: ProviderPreset, mod
 fun chatModelFor(
     account: ProviderAccount,
     preset: ProviderPreset,
-    fallback: String = ProviderRegistry.OPENAI.defaultChatModel.orEmpty(),
+    fallback: String = ProviderRegistry.LOCAL_CLEANUP.defaultChatModel.orEmpty(),
 ): String {
+    if (preset.id == ProviderRegistry.LOCAL_CLEANUP.id) {
+        return account.transcriptionModel.ifBlank { account.chatModel.ifBlank { preset.defaultChatModel ?: fallback } }
+    }
     sharedSingleCallModel(account)?.let { return it }
     return account.chatModel.ifBlank { preset.defaultChatModel ?: fallback }
 }
@@ -286,7 +270,11 @@ private fun sharedSingleCallModel(account: ProviderAccount): String? =
 fun chatModelIsPresetDefault(account: ProviderAccount, preset: ProviderPreset): Boolean =
     // A model handed over by the merged field is the user's choice like any other, so it needs no
     // explanation of where it came from.
-    sharedSingleCallModel(account) == null && account.chatModel.isBlank()
+    if (preset.id == ProviderRegistry.LOCAL_CLEANUP.id) {
+        account.transcriptionModel.isBlank() && account.chatModel.isBlank()
+    } else {
+        sharedSingleCallModel(account) == null && account.chatModel.isBlank()
+    }
 
 /**
  * The provider keyring: every configured [ProviderAccount] keyed by provider id. Persisted as a single

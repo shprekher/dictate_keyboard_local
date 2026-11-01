@@ -229,7 +229,6 @@ dependencies {
 
     // Play Billing for the optional Dictate Cloud credit packs (#255 follow-up). Version 8 is
     // not a choice: from 31.08.2026 Play refuses uploads built against anything older.
-    implementation(libs.android.billing.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.autofill)
@@ -250,10 +249,11 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.window.core)
     implementation(libs.cache4k)
+    // Qwen3-ASR (#406): unpack the verified upstream tar.bz2 on-device (pure Java).
+    implementation(libs.commons.compress)
     // GIF search (Klipy): Compose image loading + animated GIF/WebP decoding + OkHttp network fetcher.
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
-    implementation(libs.coil.network.okhttp)
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)
@@ -269,8 +269,7 @@ dependencies {
     //                       under assets/mlkit-google-ocr-models/ to 1.28 MB
     //   installed ~12.6 MB — the .so is stored uncompressed and page-aligned (11.06 MB) plus 1.49 MB
     //                       of models. armeabi-v7a is 6.78 MB, x86_64 11.63 MB.
-    // Next to the 26 MB of libonnxruntime.so this app already ships, and play-services-base/-basement
-    // already come in via play-services-wearable.
+    // Next to the 26 MB of libonnxruntime.so this app already ships.
     implementation(libs.mlkit.text.recognition)
     implementation(libs.okhttp)
     implementation(libs.patrickgold.compose.tooltip)
@@ -293,9 +292,6 @@ dependencies {
     implementation(projects.lib.dictateCore)
     implementation(projects.lib.compose)
 
-    // Wearable Data Layer: settings sync + tethered transcription with the Wear OS app (#106).
-    implementation(libs.play.services.wearable)
-    implementation(libs.kotlinx.coroutines.play.services)
     implementation(projects.lib.kotlin)
     implementation(projects.lib.snygg)
 
@@ -355,6 +351,14 @@ val verifyBergamotLib by tasks.registering {
     }
 }
 tasks.named("preBuild").configure { dependsOn(verifyBergamotLib) }
+
+val verifyCleanupLib by tasks.registering {
+    val library = layout.projectDirectory.file("src/main/jniLibs/arm64-v8a/libdictate_cleanup.so").asFile
+    doLast {
+        check(library.exists()) { "Missing libdictate_cleanup.so. Run tools/local-cleanup/build-android.sh" }
+    }
+}
+tasks.named("preBuild").configure { dependsOn(verifyCleanupLib) }
 
 fun getGitCommitHash(short: Boolean = false): Provider<String> {
     if (!File(".git").exists()) {

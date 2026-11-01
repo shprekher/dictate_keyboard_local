@@ -241,12 +241,23 @@ internal object OnlineRecognizerCache {
         Thread(r, "stt-live-idle-unload").apply { isDaemon = true }
     }
     private var idleFuture: ScheduledFuture<*>? = null
+    private var idleGeneration = 0L
+
+    @Synchronized
+    fun setRetention(millis: Long) {
+        idleUnloadMillis = millis.coerceAtLeast(0)
+        if (activeUsers == 0) armIdle()
+    }
+
+    @Synchronized
+    fun preloadIfIdle(modelDir: File, numThreads: Int) {
+        if (activeUsers > 0) return
+        acquire(modelDir, numThreads)
+        endUse()
+    }
 
     @Synchronized
     fun acquire(modelDir: File, numThreads: Int): OnlineRecognizer {
-        idleFuture?.cancel(false)
-        idleFuture = null
-
         val encoder = File(modelDir, LocalTranscriptionProvider.ENCODER)
         val decoder = File(modelDir, LocalTranscriptionProvider.DECODER)
         val joiner = File(modelDir, LocalTranscriptionProvider.JOINER)
@@ -259,6 +270,10 @@ internal object OnlineRecognizerCache {
         }
 
         val cacheKey = modelDir.absolutePath
+        check(activeUsers == 0 || key == cacheKey) { "The live speech model is still in use" }
+        idleFuture?.cancel(false)
+        idleFuture = null
+        idleGeneration++
         val existing = recognizer
         val rec = if (existing != null && cacheKey == key) {
             existing
@@ -271,7 +286,7 @@ internal object OnlineRecognizerCache {
                 key = cacheKey
             }
         }
-        releasePending = false
+        if (activeUsers == 0) releasePending = false
         activeUsers++
         return rec
     }
@@ -294,6 +309,7 @@ internal object OnlineRecognizerCache {
     }
 
     private fun freeNow() {
+        idleGeneration++
         idleFuture?.cancel(false)
         idleFuture = null
         recognizer?.release()
@@ -303,11 +319,14 @@ internal object OnlineRecognizerCache {
     }
 
     private fun armIdle() {
+        val generation = ++idleGeneration
         idleFuture?.cancel(false)
         idleFuture = null
         val delay = idleUnloadMillis
         if (delay > 0 && recognizer != null) {
-            idleFuture = scheduler.schedule({ unload() }, delay, TimeUnit.MILLISECONDS)
+            idleFuture = scheduler.schedule({
+                synchronized(this) { if (generation == idleGeneration && activeUsers == 0) freeNow() }
+            }, delay, TimeUnit.MILLISECONDS)
         }
     }
 

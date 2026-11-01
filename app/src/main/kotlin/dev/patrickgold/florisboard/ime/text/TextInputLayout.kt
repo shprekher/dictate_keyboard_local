@@ -32,7 +32,6 @@ import dev.patrickgold.florisboard.R
 import dev.patrickgold.florisboard.app.FlorisPreferenceStore
 import dev.patrickgold.florisboard.dictate.translate.TranslateBar
 import dev.patrickgold.florisboard.ime.keyboard.FlorisImeSizing
-import dev.patrickgold.florisboard.dictate.gif.GifSearchPanel
 import dev.patrickgold.florisboard.dictate.sticker.StickerSearchPanel
 import dev.patrickgold.florisboard.ime.clipboard.ClipboardSearchPanel
 import dev.patrickgold.florisboard.ime.media.emoji.EmojiRow
@@ -65,7 +64,6 @@ fun TextInputLayout(
     val state by keyboardManager.activeState.collectAsState()
     val evaluator by keyboardManager.activeEvaluator.collectAsState()
     val emojiSearchActive by keyboardManager.emojiSearchQuery.collectAsState()
-    val gifSearchActive by keyboardManager.gifSearchQuery.collectAsState()
     val stickerSearchActive by keyboardManager.stickerSearchQuery.collectAsState()
     val clipboardSearchActive by keyboardManager.clipboardSearchQuery.collectAsState()
     val translateActive by keyboardManager.translateQuery.collectAsState()
@@ -83,19 +81,18 @@ fun TextInputLayout(
         // in, and its mic dictates into it. The keys below type into the field. Each field sizes itself,
         // so the keyboard grows for as long as it is open. Only one is ever open: every one of them, and
         // every panel opener, closes the rest first.
-        val fieldOpen = translateActive != null || emojiSearchActive != null || gifSearchActive != null ||
+        val fieldOpen = translateActive != null || emojiSearchActive != null ||
             stickerSearchActive != null || clipboardSearchActive != null
         if (fieldOpen) {
             when {
                 translateActive != null -> TranslateBar()
                 emojiSearchActive != null -> EmojiSearchPanel()
-                gifSearchActive != null -> GifSearchPanel()
                 stickerSearchActive != null -> StickerSearchPanel()
                 clipboardSearchActive != null -> ClipboardSearchPanel()
             }
         }
         // Called in the same place whether a field is open or not, so opening one does not rebuild it.
-        Smartbar(showPromptRow = !fieldOpen)
+        Smartbar()
         // The recent-emoji row (#340) sits between the Smartbar and the keys, exactly where a number row
         // would. Not while a field is open — its taps are character keys and would land in the field,
         // and the field has already made the keyboard taller — and not over the actions overflow, which

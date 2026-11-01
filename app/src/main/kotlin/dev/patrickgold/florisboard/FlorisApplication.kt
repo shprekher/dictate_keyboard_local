@@ -29,7 +29,6 @@ import dev.patrickgold.florisboard.app.FlorisPreferenceModel
 import dev.patrickgold.florisboard.app.FlorisPreferenceStore
 import dev.patrickgold.florisboard.app.PreferenceRecovery
 import dev.patrickgold.florisboard.dictate.data.prefs.DictateLegacyMigrator
-import dev.patrickgold.florisboard.dictate.wear.DictateWearPublisher
 import dev.patrickgold.florisboard.ime.clipboard.ClipboardManager
 import dev.patrickgold.florisboard.ime.core.SubtypeManager
 import dev.patrickgold.florisboard.ime.dictionary.DictionaryManager
@@ -79,6 +78,7 @@ class FlorisApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         FlorisApplicationReference = WeakReference(this)
+        dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupProvider.initialize(this)
         // The translation engine's process (issue #424) runs one service and touches none of this: the
         // preference store, the dictionaries, the Wear publisher would all be a second copy of the
         // keyboard in memory, in the process that exists precisely to keep memory out of the keyboard.
@@ -121,8 +121,13 @@ class FlorisApplication : Application() {
         super.onTrimMemory(level)
         // Under memory pressure, free the on-device STT model from RAM (it can be ~100 MB up to ~700 MB).
         // Safe mid-transcription (deferred until it finishes); the next on-device dictation rebuilds it.
-        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
-            dev.patrickgold.florisboard.dictate.provider.LocalTranscriptionProvider.unloadCachedModel()
+        if (level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+        ) {
+            dev.patrickgold.florisboard.dictate.provider.LocalModelPreloader.cancel()
+            dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupProvider.unloadNow()
+            scope.launch { dev.patrickgold.florisboard.dictate.provider.LocalTranscriptionProvider.unloadCachedModel() }
         }
     }
 
@@ -144,18 +149,14 @@ class FlorisApplication : Application() {
             DictateLegacyMigrator.migrateProviderKeyringIfNeeded()
             DictateLegacyMigrator.removeLivePromptActionIfNeeded(this@FlorisApplication)
             DictateLegacyMigrator.migratePromptsActionIfNeeded(this@FlorisApplication)
-            DictateLegacyMigrator.migratePromptsLayoutToRowIfNeeded()
             DictateLegacyMigrator.migratePushToTalkDefaultIfNeeded()
             DictateLegacyMigrator.migrateTrustUserCertsToAccountsIfNeeded()
             DictateLegacyMigrator.migrateWordLearningDefaultIfNeeded()
             DictateLegacyMigrator.migrateHindiDefaultsIfNeeded()
             DictateLegacyMigrator.migrateFrenchPunctuationRuleIfNeeded()
             DictateLegacyMigrator.migrateDevanagariPunctuationRuleIfNeeded()
-            DictateLegacyMigrator.reofferRateAndDonateIfNeeded()
             preferenceStoreLoaded.value = true
-            // Keep the Wear OS companion's settings snapshot fresh: re-publish whenever a watch-relevant
             // phone setting changes (#106), so the watch reflects accent/provider/key/prompt automatically.
-            DictateWearPublisher.startPublishingOnChange(this@FlorisApplication, scope)
         }
         extensionManager.value.init()
         clipboardManager.value.initializeForContext(this)

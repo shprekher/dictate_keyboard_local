@@ -32,6 +32,7 @@
 # invokes their methods via JNI by name (e.g. GetFieldID "blankPenalty"). R8 shrinking otherwise
 # drops the "unused" fields, causing NoSuchFieldError at runtime — keep the whole package intact.
 -keep class com.k2fsa.sherpa.onnx.** { *; }
+-keep class dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupNative { *; }
 
 # On-device translation (issue #424): libdictate_bergamot.so binds its JNI functions by the class's
 # name (Java_dev_patrickgold_…_BergamotNative_*), so the class and its native methods keep their names.

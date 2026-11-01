@@ -124,7 +124,7 @@ fun DictateStatsScreen() = FlorisScreen {
                 StatItem(Icons.Default.Notes, formatDecimal(avgWords), stringRes(R.string.dictate__stats_avg_words)),
                 StatItem(Icons.Default.Speed, "${formatDecimal(paceWpm)} ${stringRes(R.string.dictate__stats_pace_unit)}", stringRes(R.string.dictate__stats_pace)),
                 StatItem(Icons.Default.Tag, formatCount(chars), stringRes(R.string.dictate__stats_chars)),
-                StatItem(Icons.Default.AutoFixHigh, formatCount(rewordings), stringRes(R.string.dictate__stats_rewordings)),
+                StatItem(Icons.Default.AutoFixHigh, formatCount(rewordings), stringRes(R.string.dictate__stats_text_passes)),
                 StatItem(
                     Icons.Default.LocalFireDepartment,
                     formatCount(streakCurrent.toLong()),

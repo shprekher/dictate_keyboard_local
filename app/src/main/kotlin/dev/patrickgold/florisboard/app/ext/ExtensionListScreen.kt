@@ -117,7 +117,6 @@ fun ExtensionListScreen(type: ExtensionListScreenType, showUpdate: Boolean) = Fl
                     ImportExtensionBox(navController)
                 }
                 item {
-                    UpdateBox(extensionIndex = extensionIndex)
                 }
             }
             items(extensionIndex) { ext ->

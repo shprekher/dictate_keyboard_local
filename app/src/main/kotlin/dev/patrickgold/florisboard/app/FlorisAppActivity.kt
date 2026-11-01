@@ -222,25 +222,6 @@ class FlorisAppActivity : ComponentActivity() {
                     )
                     PreviewKeyboardField(previewFieldController)
                 }
-                // Show the "What's new" surface once after an update (only when setup is complete, so
-                // it never competes with the onboarding flow). For the 5.0 milestone this is the
-                // full-screen tour; for other updates it stays the compact changelog dialog. The tour
-                // and dialog are mutually exclusive per update so they never both appear.
-                if (isImeSetUp) {
-                    val whatsNewContext = LocalContext.current
-                    // Every "What's new" tour the user hasn't seen yet (e.g. 4.x → 5.1 gets both 5.0 and
-                    // 5.1); empty means fall back to the compact changelog dialog for this update.
-                    val autoQueue = remember {
-                        AppVersionUtils.pendingTourVersions(
-                            whatsNewContext, prefs, WHATS_NEW_TOURS.map { it.version },
-                        )
-                    }
-                    if (autoQueue.isEmpty()) {
-                        ChangelogDialog()
-                    }
-                    // Always composed so Settings › About can re-open any tour; only auto-shows when queued.
-                    WhatsNewTour(autoQueue = autoQueue)
-                }
             }
         }
 

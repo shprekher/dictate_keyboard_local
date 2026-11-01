@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.patrickgold.florisboard.R
 import dev.patrickgold.florisboard.app.FlorisPreferenceStore
+import dev.patrickgold.jetpref.datastore.model.collectAsState
 import kotlinx.coroutines.launch
 import dev.patrickgold.florisboard.dictate.provider.LocalModelCatalog
 import dev.patrickgold.florisboard.dictate.provider.LocalModelDownloads
@@ -181,7 +182,8 @@ fun LocalModelSection(
         // Idle-unload timeout: after how long an idle on-device model is freed from RAM. The model is
         // always also freed on an Android memory-pressure signal; this only covers the "app alive but not
         // dictating" window. 0 = only on memory pressure.
-        var unloadMin by remember { mutableStateOf(prefs.dictate.localModelUnloadMinutes.get()) }
+        val savedUnloadMin by prefs.dictate.localModelUnloadMinutes.collectAsState()
+        var unloadMin by remember(savedUnloadMin) { mutableStateOf(savedUnloadMin) }
         Text(
             text = if (unloadMin <= 0) {
                 stringRes(R.string.dictate__local_unload_pressure)
@@ -196,10 +198,16 @@ fun LocalModelSection(
             value = unloadMin.toFloat(),
             onValueChange = { unloadMin = it.roundToInt() },
             onValueChangeFinished = {
-                scope.launch { prefs.dictate.localModelUnloadMinutes.set(unloadMin) }
+                scope.launch {
+                    prefs.dictate.localModelUnloadMinutes.set(unloadMin)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        dev.patrickgold.florisboard.dictate.provider.LocalTranscriptionProvider.setIdleUnloadMillis(unloadMin * 60_000L)
+                        dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupProvider.retentionChanged()
+                    }
+                }
             },
             valueRange = 0f..30f,
-            steps = 5,
+            steps = 29,
         )
         HorizontalDivider(modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
 
@@ -280,4 +288,3 @@ private fun ModelRows(
         }
     }
 }
-

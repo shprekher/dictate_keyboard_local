@@ -34,6 +34,11 @@ On-device speech recognition models
 The on-device models are downloaded on demand and are not part of this source
 distribution. They are mirrored unmodified on the project's GitHub releases.
 
+    Qwen3-ASR 0.6B INT8 (optional, downloaded from sherpa-onnx upstream)
+    Copyright Qwen Team / Alibaba Cloud — https://github.com/QwenLM/Qwen3-ASR
+    Licensed under Apache-2.0. ONNX conversion by Wasser1462:
+    https://github.com/Wasser1462/Qwen3-ASR-onnx
+
     Kroko ASR community models (streaming, issue #233)
     Copyright Banafo — https://huggingface.co/Banafo/Kroko-ASR
     Licensed under CC-BY-SA. ONNX export by the sherpa-onnx project (Apache-2.0).
@@ -63,6 +68,25 @@ distribution. They are mirrored unmodified on the project's GitHub releases.
 
     All of the above are exported to ONNX by the sherpa-onnx project
     (https://github.com/k2-fsa/sherpa-onnx), licensed under Apache-2.0.
+
+================================================================================
+On-device text cleanup
+================================================================================
+
+Optional; the model is downloaded on demand and is not part of this source
+distribution. The cleanup engine (llama.cpp) is statically linked.
+
+    Qwen3 1.7B Q4_K_M and Qwen3 0.6B Q4_K_M — Copyright Qwen Team / Alibaba Cloud
+    https://huggingface.co/Qwen/Qwen3-1.7B — Apache-2.0
+    GGUF quantization by Unsloth:
+    https://huggingface.co/unsloth/Qwen3-1.7B-GGUF
+    https://huggingface.co/unsloth/Qwen3-0.6B-GGUF
+
+    Qwen3.5 0.8B GEC Q4_0 — Copyright Loqira Labs / Qwen Team
+    https://huggingface.co/loqira/Qwen3.5-0.8B-GEC-KAZ-RUS-ENG — Apache-2.0
+
+    llama.cpp — Copyright The ggml authors
+    https://github.com/ggml-org/llama.cpp — MIT License
 
 ================================================================================
 Chinese Pinyin language pack

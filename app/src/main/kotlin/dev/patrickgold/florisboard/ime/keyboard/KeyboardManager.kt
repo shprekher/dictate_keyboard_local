@@ -154,13 +154,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
      */
     val emojiSearchQuery = MutableStateFlow<String?>(null)
 
-    // GIF search (KLIPY). [gifSearchQuery] is non-null while the user is TYPING a query (keyboard shown,
-    // keystrokes folded into it instead of the editor; a search bar shows above the keyboard). Pressing
-    // Enter submits: [gifSearchQuery] clears and [gifSearchSubmit] holds the committed query, which makes
-    // the full-panel GifPanel show a large results grid. [gifSearchSubmit] null = the panel's home view.
-    val gifSearchQuery = MutableStateFlow<String?>(null)
-    val gifSearchSubmit = MutableStateFlow<String?>(null)
-
     /**
      * The Devanagari consonant sitting directly in front of the cursor, or [DevanagariBase.NONE] (#315).
      *
@@ -223,13 +216,12 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
         get() = activeInternalField() != null
 
     /** The keyboard's own fields (issue #424): the ones the keys can type into instead of the app. */
-    enum class InternalField { TRANSLATE, EMOJI_SEARCH, GIF_SEARCH, STICKER_SEARCH, CLIPBOARD_SEARCH }
+    enum class InternalField { TRANSLATE, EMOJI_SEARCH, STICKER_SEARCH, CLIPBOARD_SEARCH }
 
     /** The field that has the keys right now, or `null` when they go to the app. */
     fun activeInternalField(): InternalField? = when {
         translateTakesKeys -> InternalField.TRANSLATE
         emojiSearchQuery.value != null -> InternalField.EMOJI_SEARCH
-        gifSearchQuery.value != null -> InternalField.GIF_SEARCH
         stickerSearchQuery.value != null -> InternalField.STICKER_SEARCH
         clipboardSearchQuery.value != null -> InternalField.CLIPBOARD_SEARCH
         else -> null
@@ -238,7 +230,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
     private fun queryOf(field: InternalField): MutableStateFlow<String?> = when (field) {
         InternalField.TRANSLATE -> translateQuery
         InternalField.EMOJI_SEARCH -> emojiSearchQuery
-        InternalField.GIF_SEARCH -> gifSearchQuery
         InternalField.STICKER_SEARCH -> stickerSearchQuery
         InternalField.CLIPBOARD_SEARCH -> clipboardSearchQuery
     }
@@ -293,7 +284,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
     fun closeInternalFields(finishTranslate: Boolean = true) {
         closeTranslate(finishTranslate)
         closeEmojiSearch(returnToMedia = false)
-        closeGifSearch(returnToPanel = false)
         closeStickerSearch(returnToPanel = false)
         closeClipboardSearch(returnToPanel = false)
     }
@@ -520,7 +510,7 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
                 combine(
                     listOf<Flow<Any?>>(
                         translateQuery, fieldCursor, translateFocused, fieldSelection,
-                        emojiSearchQuery, gifSearchQuery, stickerSearchQuery, clipboardSearchQuery,
+                        emojiSearchQuery, stickerSearchQuery, clipboardSearchQuery,
                     ),
                 ) {
                     activeInternalField()?.let { field -> fieldText(field)?.let { field to it } }
@@ -1042,14 +1032,7 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
      * Never in a password field, and never while something is selected (the selection is what the user
      * means to replace, not the word before it).
      */
-    private fun pendingSnippetTrigger(): String? {
-        if (SnippetTriggers.isEmpty) return null
-        if (activeState.keyVariation == KeyVariation.PASSWORD) return null
-        val content = editorInstance.activeContent
-        if (content.selection.isSelectionMode) return null
-        val token = SnippetTriggers.triggerCandidate(content.textBeforeSelection) ?: return null
-        return token.takeIf { SnippetTriggers.bodyFor(it) != null }
-    }
+    private fun pendingSnippetTrigger(): String? = null // Saved-prompt expansion is retired; data is retained.
 
     private fun expandSnippet(boundary: String): Boolean {
         val token = pendingSnippetTrigger() ?: return false
@@ -1617,7 +1600,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
             return
         }
         closeEmojiSearch(returnToMedia = false)
-        closeGifSearch(returnToPanel = false)
         closeStickerSearch(returnToPanel = false)
         closeClipboardSearch(returnToPanel = false)
         activeState.imeUiMode = ImeUiMode.TEXT
@@ -1677,7 +1659,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
                         reevaluateInputShiftState()
                     }
                     field == InternalField.TRANSLATE -> translateBar.submit { performTranslateEnter() }
-                    field == InternalField.GIF_SEARCH -> submitGifSearch(current.text)
                     else -> Unit
                 }
                 return true
@@ -1725,7 +1706,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
     private fun closeSearch(field: InternalField) {
         when (field) {
             InternalField.EMOJI_SEARCH -> closeEmojiSearch()
-            InternalField.GIF_SEARCH -> closeGifSearch()
             InternalField.STICKER_SEARCH -> closeStickerSearch()
             InternalField.CLIPBOARD_SEARCH -> closeClipboardSearch()
             InternalField.TRANSLATE -> closeTranslate()
@@ -1849,7 +1829,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
     /** Closes whichever search is open and leaves the keyboard to the app — not the panel it came from. */
     private fun closeSearchesForApp() {
         closeEmojiSearch(returnToMedia = false)
-        closeGifSearch(returnToPanel = false)
         closeStickerSearch(returnToPanel = false)
         closeClipboardSearch(returnToPanel = false)
     }
@@ -1890,12 +1869,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
     fun clearEmojiSearch() {
         if (emojiSearchQuery.value == null) return
         startField(emojiSearchQuery)
-    }
-
-    /** Empties the GIF query without leaving the search — the ✕ inside the search bar. */
-    fun clearGifSearch() {
-        if (gifSearchQuery.value == null) return
-        startField(gifSearchQuery)
     }
 
     /** Empties the sticker query without leaving the search — the ✕ inside the search bar. */
@@ -1944,34 +1917,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
         if (stickerSearchQuery.value == null) return
         stickerSearchQuery.value = null
         if (returnToPanel) activeState.imeUiMode = ImeUiMode.STICKER
-    }
-
-    /** Starts a GIF search: shows the text keyboard so the user can type the query. */
-    fun activateGifSearch() {
-        closeTranslate()
-        activeState.imeUiMode = ImeUiMode.TEXT
-        startField(gifSearchQuery)
-    }
-
-    /**
-     * Commits the typed GIF query (on Enter or the search button): hides the keyboard and switches the
-     * full GifPanel to its results view for [query]. A blank query returns to the panel's home view.
-     */
-    fun submitGifSearch(query: String) {
-        val q = query.trim()
-        gifSearchQuery.value = null
-        gifSearchSubmit.value = q.ifBlank { null }
-        activeState.imeUiMode = ImeUiMode.GIF
-    }
-
-    /**
-     * Closes the GIF search. When [returnToPanel] is set the user is taken back to the GIF panel, which is
-     * the natural "back" destination since search is launched from there.
-     */
-    fun closeGifSearch(returnToPanel: Boolean = true) {
-        if (gifSearchQuery.value == null) return
-        gifSearchQuery.value = null
-        if (returnToPanel) activeState.imeUiMode = ImeUiMode.GIF
     }
 
     override fun onInputKeyDown(data: KeyData) {
@@ -2069,13 +2014,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
                 closeInternalFields()
                 activeState.imeUiMode = ImeUiMode.CLIPBOARD
             }
-            // Opens the KLIPY GIF search panel (its own ImeUiMode, like the media/history panels); resets
-            // any previous search so it opens on the home view (recent GIFs + trending).
-            KeyCode.IME_UI_MODE_GIF -> {
-                closeInternalFields()
-                gifSearchSubmit.value = null
-                activeState.imeUiMode = ImeUiMode.GIF
-            }
             // Opens the local sticker panel (issue #280) — the user's own folder, no network involved.
             KeyCode.IME_UI_MODE_STICKER -> {
                 closeInternalFields()
@@ -2097,11 +2035,14 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
             // The translate bar (issue #424). A toggle: the button stays in the Smartbar below the bar.
             KeyCode.TRANSLATE -> toggleTranslate()
             KeyCode.IME_UI_MODE_DICTATE -> dev.patrickgold.florisboard.dictate.DictateController.onMicClick(appContext)
-            KeyCode.DICTATE_LIVE_PROMPT -> dev.patrickgold.florisboard.dictate.DictateController.startLivePrompt(appContext)
+            KeyCode.DICTATE_LIVE_PROMPT -> Unit // Reserved legacy code; spoken editing was removed.
             KeyCode.DICTATE_PROMPTS -> {
-                closeInternalFields()
-                dev.patrickgold.florisboard.dictate.DictateController.refreshPrompts(appContext)
-                activeState.imeUiMode = ImeUiMode.DICTATE
+                appContext.startActivity(android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse("ui://florisboard/settings/dictate/cleanup"),
+                    appContext,
+                    dev.patrickgold.florisboard.app.FlorisAppActivity::class.java,
+                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             // Repurposed for the transcription history panel (issue #140): opens the browsable list of
             // recent dictations to quickly re-insert or re-transcribe, superseding the one-shot reinsert.
@@ -2397,9 +2338,6 @@ class KeyboardManager(context: Context) : InputKeyEventReceiver {
         override val state: KeyboardState,
         override val subtype: Subtype,
     ) : ComputingEvaluator {
-
-        override val isGifSearchActive: Boolean
-            get() = gifSearchQuery.value != null
 
         override val devanagariBase: String
             get() = pendingDevanagariBase.value

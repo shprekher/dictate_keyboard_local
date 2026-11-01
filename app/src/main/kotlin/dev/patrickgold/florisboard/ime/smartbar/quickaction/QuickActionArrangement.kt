@@ -81,11 +81,7 @@ data class QuickActionArrangement(
             // of what a default is for.
             dynamicActions = listOf(
                 // --- The dictation loop -------------------------------------------------------------
-                // The prompt panel opener. The live prompt is no longer a Smartbar button – it lives as a
-                // chip inside the prompt panel/row – so only the opener remains here. It costs a fresh
-                // install nothing either way: the always-on prompt ROW is the default layout, and
-                // filterDictateHidden drops this action from bar and grid alike while that row is up, so
-                // the slot only exists for the users who went back to the PANEL layout.
+                // The old prompt-panel key now opens cleanup settings, including its prompt editor.
                 QuickAction.InsertKey(TextKeyData.DICTATE_PROMPTS),
                 // The transcription history (issue #140). Despite what the key code is called, this has
                 // not re-inserted the last dictation since #140 — it opens the browsable panel: read back,
@@ -100,10 +96,6 @@ data class QuickActionArrangement(
                 // Gboard keeps its translate button in the visible bar — which is where people switching
                 // from it will look.
                 QuickAction.InsertKey(TextKeyData.TRANSLATE),
-                // GIF search panel (KLIPY). In the bar by default rather than waiting to be dragged there:
-                // it is one of the few actions people go looking for, and unlike the split or language
-                // actions it is never greyed out — without an API key the panel itself says so.
-                QuickAction.InsertKey(TextKeyData.IME_UI_MODE_GIF),
                 // Scan text (issue #390): camera → recognised lines → the one you tap. Fifth, ahead of
                 // Settings, for discovery rather than frequency: it is the feature nobody guesses a keyboard
                 // has, so it only gets found where it is seen — and five is what a 360 dp phone shows.
@@ -190,7 +182,7 @@ data class QuickActionArrangement(
         // placeholder (autocorrect is now fully automatic). -27/-28 = the line-start/line-end buttons
         // that existed for a day between two commits of #335 before they became field-start/field-end;
         // they never reached a release, but a debug arrangement can still carry them.
-        private val REMOVED_ACTION_CODES = setOf(-245, -27, -28)
+        private val REMOVED_ACTION_CODES = setOf(-245, -27, -28, -215) // -215: retired live rewording.
 
         override fun deserialize(value: String): QuickActionArrangement {
             val raw: QuickActionArrangement = QuickActionJsonConfig.decodeFromString(value)

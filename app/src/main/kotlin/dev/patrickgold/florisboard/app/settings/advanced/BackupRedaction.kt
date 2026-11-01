@@ -56,7 +56,9 @@ object BackupRedaction {
     val DROPPED_KEYS = setOf(
         "dictate__proxy_username",
         "dictate__proxy_password",
+        // Legacy backups can still carry credentials for features no longer present in this build.
         "gif__klipy_api_key",
+        "gif__customer_id",
         "dictate__api_key",
         "dictate__rewording_api_key",
         // Not credentials, but they belong to the credential that is leaving. The nudge latch is keyed to
@@ -65,7 +67,6 @@ object BackupRedaction {
         // per-install identifier sent to the provider; two devices sharing one would fuse two people's
         // history there, and it is regenerated on first use, so dropping it costs nothing.
         "dictate__cloud_low_credit_nudged",
-        "gif__customer_id",
     )
 
     /**

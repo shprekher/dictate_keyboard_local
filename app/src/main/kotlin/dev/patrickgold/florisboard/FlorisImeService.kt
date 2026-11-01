@@ -392,6 +392,7 @@ class FlorisImeService : LifecycleInputMethodService() {
         flogInfo { "restarting=$restarting info=${info?.debugSummarize()}" }
         super.onStartInputView(info, restarting)
         if (info == null) return
+        dev.patrickgold.florisboard.dictate.provider.LocalModelPreloader.preload(this)
         val editorInfo = FlorisEditorInfo.wrap(info)
         activeState.batchEdit {
             // A new editor field invalidates any in-progress emoji search (issue #110); drop it so we
@@ -409,9 +410,6 @@ class FlorisImeService : LifecycleInputMethodService() {
             editorInstance.handleStartInputView(editorInfo, isRestart = restarting)
         }
 
-        // Typed snippet triggers (issue #283) are plain local text and must work without rewording ever
-        // being switched on — so they get their own refresh here rather than riding on the prompt strip's.
-        dev.patrickgold.florisboard.dictate.snippet.SnippetTriggers.refresh(this)
 
         // File transcription: if the user picked a file via the long-press mic trampoline, transcribe
         // it now that we are back on the field. Skips instant-recording when it kicks in.
@@ -466,16 +464,6 @@ class FlorisImeService : LifecycleInputMethodService() {
             dev.patrickgold.florisboard.dictate.DictateController.onMicClick(this)
         }
 
-        // "Dictate was updated" nudge (roadmap 11.9): shown in the Smartbar after an app update so users
-        // who rarely open the settings still discover the changelog. Checked first so it takes priority
-        // over the rate/donate nudge; both no-op unless idle, so neither interrupts a recording above.
-        dev.patrickgold.florisboard.dictate.DictateController.maybePromptChangelog(this)
-        // Floating-button spotlight: one-time nudge for users who have not enabled it yet. After the
-        // changelog nudge so it does not compete on the same update; all no-op unless idle.
-        dev.patrickgold.florisboard.dictate.DictateController.maybePromptFloatingButton(this)
-        // Rate/donate nudge (roadmap 9.7/9.8): shown in the Smartbar once enough audio was dictated.
-        // Guarded internally to no-op unless idle, so it never interrupts a recording started above.
-        dev.patrickgold.florisboard.dictate.DictateController.maybePromptForReview()
     }
 
     override fun onEvaluateInputViewShown(): Boolean {

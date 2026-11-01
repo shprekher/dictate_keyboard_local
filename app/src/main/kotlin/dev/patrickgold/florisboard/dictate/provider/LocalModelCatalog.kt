@@ -13,13 +13,25 @@ package dev.patrickgold.florisboard.dictate.provider
 /**
  * One downloadable file of an on-device model. [destName] is the fixed name it is stored under (so the
  * runtime stays variant-agnostic — see [LocalTranscriptionProvider]); [sizeBytes] and [sha256] are
- * verified after download to guarantee integrity.
+ * verified after download or archive extraction to guarantee integrity. For archive members [url]
+ * identifies the source archive rather than an individual download.
  */
 data class LocalModelFile(
     val url: String,
     val destName: String,
     val sizeBytes: Long,
     val sha256: String? = null,
+)
+
+/**
+ * Verified tar.bz2 download. Only [members] (archive path -> installed name) are extracted;
+ * their individual sizes and hashes are declared in [LocalModelSpec.files].
+ */
+data class LocalModelArchive(
+    val url: String,
+    val sizeBytes: Long,
+    val sha256: String,
+    val members: Map<String, String>,
 )
 
 /**
@@ -48,6 +60,9 @@ enum class LocalModelKind {
      * field at all — it is neither told a language nor offered "auto", it simply decodes.
      */
     DOLPHIN,
+
+    /** Qwen3-ASR: convolution frontend, encoder, LLM decoder and a BPE tokenizer directory. */
+    QWEN3_ASR,
 }
 
 /**
@@ -157,8 +172,11 @@ data class LocalModelSpec(
      * hundreds of megabytes they can no longer delete *and* a recognizer built from the wrong kind.
      */
     val supersededBy: String? = null,
+    /** Optional archive supplying some of [files]; other files still download individually. */
+    val archive: LocalModelArchive? = null,
 ) {
-    val totalBytes: Long get() = files.sumOf { it.sizeBytes }
+    val totalBytes: Long get() = (archive?.sizeBytes ?: 0L) +
+        files.filter { it.destName !in archive?.members.orEmpty().values }.sumOf { it.sizeBytes }
 
     /**
      * Whether a long recording is cut into pieces at speech pauses before decoding.
@@ -185,9 +203,8 @@ data class LocalModelSpec(
  * sherpa-onnx builds.
  *
  * **Attribution / licensing:** every model here comes from an upstream project under a license that
- * permits redistribution (see each entry, and NOTICE). The files are mirrored on the project's own
- * GitHub release ([REL]) for a stable, project-controlled source instead of depending on a third party
- * at runtime. To re-point hosting, change [REL] only. The runtime never fetches this list — it is
+ * permits redistribution (see each entry, and NOTICE). Except for Qwen's upstream archive, files are
+ * mirrored on the project's own GitHub release ([REL]). The runtime never fetches this list — it is
  * shipped in the app.
  */
 object LocalModelCatalog {
@@ -252,6 +269,45 @@ object LocalModelCatalog {
     private val VAD_FILE = LocalModelFile(
         "$REL/silero_vad.onnx", LocalTranscriptionProvider.VAD, 643_854,
         "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+    )
+
+    private const val QWEN_PACKAGE = "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25"
+    private const val QWEN_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$QWEN_PACKAGE.tar.bz2"
+
+    /** Optional CPU-only experiment (#406): ~879 MB download, ~988 MB installed, substantial RAM. */
+    val QWEN3_ASR_06B_INT8 = LocalModelSpec(
+        id = "qwen3-asr-0.6b-int8-2026-03-25",
+        displayName = "Qwen3-ASR 0.6B INT8 (experimental)",
+        languages = listOf("en", "ru"),
+        punctuates = true,
+        // This export has a 512-token context shared by audio (~13 tokens/s), prompt and text.
+        // Keep pieces short to leave room for Russian BPE tokens as well as bound CPU/RAM use.
+        maxSegmentSeconds = 15,
+        kind = LocalModelKind.QWEN3_ASR,
+        credit = ModelCredit("Qwen Team / Alibaba Cloud", "Apache-2.0", "https://github.com/QwenLM/Qwen3-ASR"),
+        files = listOf(
+            // Archive-backed files name the source archive; the manager extracts, not downloads, them.
+            LocalModelFile(QWEN_URL, LocalTranscriptionProvider.CONV_FRONTEND, 44_148_281, "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e"),
+            LocalModelFile(QWEN_URL, LocalTranscriptionProvider.ENCODER, 182_491_662, "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9"),
+            LocalModelFile(QWEN_URL, LocalTranscriptionProvider.DECODER, 755_914_231, "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771"),
+            LocalModelFile(QWEN_URL, "tokenizer/vocab.json", 2_776_833, "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"),
+            LocalModelFile(QWEN_URL, "tokenizer/merges.txt", 1_671_853, "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"),
+            LocalModelFile(QWEN_URL, "tokenizer/tokenizer_config.json", 12_487, "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c"),
+            VAD_FILE,
+        ),
+        archive = LocalModelArchive(
+            url = QWEN_URL,
+            sizeBytes = 878_702_423,
+            sha256 = "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96",
+            members = mapOf(
+                "$QWEN_PACKAGE/conv_frontend.onnx" to LocalTranscriptionProvider.CONV_FRONTEND,
+                "$QWEN_PACKAGE/encoder.int8.onnx" to LocalTranscriptionProvider.ENCODER,
+                "$QWEN_PACKAGE/decoder.int8.onnx" to LocalTranscriptionProvider.DECODER,
+                "$QWEN_PACKAGE/tokenizer/vocab.json" to "tokenizer/vocab.json",
+                "$QWEN_PACKAGE/tokenizer/merges.txt" to "tokenizer/merges.txt",
+                "$QWEN_PACKAGE/tokenizer/tokenizer_config.json" to "tokenizer/tokenizer_config.json",
+            ),
+        ),
     )
 
     /** ~99 MB. Fastest, lowest accuracy — good for low-end devices / quick notes. */
@@ -349,6 +405,25 @@ object LocalModelCatalog {
             VAD_FILE,
         ),
     )
+
+    /** Large-v3's encoder with a four-layer decoder; the pinned sherpa INT8 export, not a GGML model. */
+    val WHISPER_LARGE_V3_TURBO = LocalModelSpec(
+        id = "whisper-large-v3-turbo-int8",
+        displayName = "Whisper Large-v3-Turbo",
+        languages = Langs.WHISPER,
+        punctuates = true,
+        family = LocalModelFamily.WHISPER,
+        credit = Credits.WHISPER,
+        maxSegmentSeconds = 28,
+        files = listOf(
+            LocalModelFile("$TURBO_URL/turbo-encoder.int8.onnx", LocalTranscriptionProvider.ENCODER, 674_716_297, "b02dcdf54f348741e93fe732b67d933c8dcb6735655f710640143081db38878b"),
+            LocalModelFile("$TURBO_URL/turbo-decoder.int8.onnx", LocalTranscriptionProvider.DECODER, 361_080_764, "20accd02388482eb3a46bd615631adfdc85e1eb2c7db9ea3f02a40ffe6b81547"),
+            LocalModelFile("$TURBO_URL/turbo-tokens.txt", LocalTranscriptionProvider.TOKENS, 816_730, "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126"),
+            VAD_FILE,
+        ),
+    )
+
+    private const val TURBO_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo/resolve/2ca6ff69fc878651b770880507669577ac41c2ff"
 
     /**
      * ~670 MB. Parakeet Ultra (issue #414) — moondream's post-train of [PARAKEET_TDT_V3], which it
@@ -889,8 +964,10 @@ object LocalModelCatalog {
         GIGAAM_V3_RU,
         GIGAAM_V2_RU,
         PARAKEET_PRIMELINE_DE,
+        QWEN3_ASR_06B_INT8,
         WHISPER_TINY, WHISPER_BASE, WHISPER_SMALL,
         WHISPER_TINY_EN, WHISPER_BASE_EN, WHISPER_SMALL_EN,
+        WHISPER_LARGE_V3_TURBO,
         KROKO_EN, KROKO_DE, KROKO_ES, KROKO_FR,
         KROKO_IT, KROKO_NL, KROKO_PT, KROKO_SV, KROKO_TR, KROKO_HE,
     )

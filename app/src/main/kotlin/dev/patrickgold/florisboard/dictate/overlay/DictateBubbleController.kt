@@ -901,11 +901,8 @@ class DictateBubbleController(private val service: DictateAccessibilityService) 
             DictateController.holdForLocalModel(context)
             return
         }
-        // Rewording only makes sense when not already recording/transcribing. A parked nudge is neither —
-        // and used to make this menu open into nothing, the same way it blocked [applyPrompt] (#339).
-        if (state !is DictateController.UiState.Idle && state !is DictateController.UiState.Error &&
-            state !is DictateController.UiState.Promo
-        ) {
+        // Rewording only makes sense when not already recording/transcribing.
+        if (state !is DictateController.UiState.Idle && state !is DictateController.UiState.Error) {
             return
         }
         if (floatingButtonTapBuzzes(context, prefs)) vibrateTap()
@@ -916,18 +913,10 @@ class DictateBubbleController(private val service: DictateAccessibilityService) 
 
     private fun showPromptMenu() {
         if (menuAdded) return
-        scope.launch {
-            val prompts = withContext(Dispatchers.IO) {
-                runCatching { PromptsDatabaseHelper.getInstance(context).getAll() }.getOrDefault(emptyList())
-            }.filter { !it.name.isNullOrBlank() }
-            if (menuAdded) return@launch
-            // Always show the menu — the Live Prompt entry (freeform voice command, #230) is always
-            // available even with no saved rewording prompts.
-            addPromptMenu(prompts)
-        }
+        addPromptMenu()
     }
 
-    private fun addPromptMenu(prompts: List<PromptModel>) {
+    private fun addPromptMenu() {
         // The rows, and nothing else: the card they sit on is built further down and stays put while
         // these scroll inside it.
         val list = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -1004,36 +993,7 @@ class DictateBubbleController(private val service: DictateAccessibilityService) 
                 rowParams(),
             )
         }
-        if (actions.isNotEmpty()) divider()
-        // Live Prompt heads the prompts (freeform voice command, #230): records a spoken instruction via
-        // the floating button, then rewords it — with the selected text as context, or generating from
-        // scratch — and injects the result. The icon is the chip's own on the prompt strip,
-        // `Icons.Default.RecordVoiceOver` — the **filled** one: its outlined twin is a different icon and
-        // reads as a different thing beside the filled rows around it.
-        list.addView(
-            menuItem(
-                context.getString(R.string.quick_action__dictate_live_prompt),
-                R.drawable.ic_dictate_live_prompt,
-                bold = true,
-            ) {
-                hidePromptMenu()
-                startingDictation {
-                    DictateController.startLivePrompt(context, DictateController.OutputTarget.OVERLAY)
-                }
-            },
-            rowParams(),
-        )
-        prompts.forEach { prompt ->
-            list.addView(
-                menuItem(prompt.name.orEmpty(), promptIcon(prompt), bold = false) {
-                    hidePromptMenu()
-                    DictateController.applyPrompt(
-                        context, prompt, target = DictateController.OutputTarget.OVERLAY,
-                    )
-                },
-                rowParams(),
-            )
-        }
+        if (actions.isEmpty()) return
         // The card is as wide as its widest row and no wider — it used to stretch across the whole screen
         // because a ScrollView gives an unparameterised child MATCH_PARENT — and no taller than a share of
         // the screen. Past that only the rows move: the scrolling view sits *inside* the card rather than
@@ -1108,18 +1068,6 @@ class DictateBubbleController(private val service: DictateAccessibilityService) 
         menuView = null
     }
 
-    /**
-     * The icon this prompt wears on the keyboard's prompt strip, as a drawable the menu can use.
-     *
-     * Deliberately the same three-way split as `dictatePromptIcon` — snippet, needs-a-selection,
-     * everything else — so a prompt looks the same wherever the user meets it. If that split ever
-     * changes, both places change together.
-     */
-    private fun promptIcon(prompt: PromptModel): Int = when {
-        prompt.snippetBody() != null -> R.drawable.ic_dictate_prompt_snippet
-        prompt.requiresSelection -> R.drawable.ic_dictate_prompt_selection
-        else -> R.drawable.ic_dictate_prompt_auto
-    }
 
     /** Runs one of the menu's actions (#408). The menu is already closed by the time this is called. */
     private fun runMenuAction(action: BubbleMenuAction) = when (action) {

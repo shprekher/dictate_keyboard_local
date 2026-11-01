@@ -862,13 +862,7 @@ fun QuickActionButton(
                                             modifier = Modifier.alpha(lockFlash),
                                         )
                                     }
-                                    // The Material "GIF" glyph draws small lettering inside a lot of padding;
-                                    // scale it up so the "GIF" text is legible at the Smartbar icon size.
-                                    val iconModifier = if (action.data.code == KeyCode.IME_UI_MODE_GIF) {
-                                        Modifier.scale(1.45f)
-                                    } else {
-                                        Modifier
-                                    }
+                                    val iconModifier = Modifier
                                     SnyggIcon(
                                         imageVector = imageVector,
                                         // Fades in underneath the lock as it fades out, so the two read as

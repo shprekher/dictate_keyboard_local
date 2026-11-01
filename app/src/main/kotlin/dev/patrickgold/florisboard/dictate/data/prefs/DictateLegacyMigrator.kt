@@ -75,7 +75,7 @@ object DictateLegacyMigrator {
 
             // --- Rewording / GPT settings (roadmap section 4). The prompts themselves live in the
             // shared prompts.db and carry over automatically; only these settings need importing. ---
-            prefs.dictate.rewordingEnabled.set(s.rewordingEnabled)
+            prefs.dictate.cleanupEnabled.set(s.rewordingEnabled)
             prefs.dictate.autoFormattingEnabled.set(s.autoFormattingEnabled)
 
             val rewordingProviderId = when (s.rewordingProvider) {
@@ -186,11 +186,6 @@ object DictateLegacyMigrator {
                 proxy.password?.let { prefs.dictate.proxyPassword.set(it) }
             }
 
-            // --- Rate/donate nudges (roadmap 9.7/9.8): carry over the "handled" flags so users who
-            // already rated/donated in the legacy app are never asked again. The old usage DB that
-            // tracked total audio time was dropped, so the new counter simply starts at 0. ---
-            prefs.dictate.hasRated.set(s.hasRatedInPlaystore)
-            prefs.dictate.hasDonated.set(s.hasDonated)
         }
 
         prefs.dictate.legacyImported.set(true)
@@ -304,26 +299,6 @@ object DictateLegacyMigrator {
         if (prefs.dictate.promptsActionMigrated.get()) return
         ensureActionPresent(TextKeyData.DICTATE_PROMPTS, KeyCode.DICTATE_PROMPTS)
         prefs.dictate.promptsActionMigrated.set(true)
-    }
-
-    /**
-     * One-time re-engagement reset for the 4.0.0 relaunch: re-offers the rate & donate nudges to
-     * existing users. Many of them already acted on (or were long past) these prompts in an earlier
-     * version, so the "handled" flags were set and/or their audio counter sat well beyond the
-     * thresholds – meaning the nudges would never appear again. As the app has changed substantially,
-     * we clear [Dictate.hasRated]/[Dictate.hasDonated] and reset [Dictate.totalAudioSeconds] so the
-     * rate prompt (after [DictateController] RATE threshold) and then the donate prompt (after the
-     * DONATE threshold) surface once more as the user dictates with the new version. For a brand-new
-     * install this is a no-op (everything is already at its default). Idempotent via
-     * `prefs.dictate.promoReengagementDone`, so it fires exactly once.
-     */
-    suspend fun reofferRateAndDonateIfNeeded() {
-        val prefs by FlorisPreferenceStore
-        if (prefs.dictate.promoReengagementDone.get()) return
-        prefs.dictate.hasRated.set(false)
-        prefs.dictate.hasDonated.set(false)
-        prefs.dictate.totalAudioSeconds.set(0L)
-        prefs.dictate.promoReengagementDone.set(true)
     }
 
     /**

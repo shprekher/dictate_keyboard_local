@@ -11,11 +11,14 @@
 package dev.patrickgold.florisboard.dictate.provider
 
 import android.content.Context
+import dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -42,7 +45,8 @@ object LocalModelManager {
 
     /** True if [modelId] is fully installed (all required files present). */
     fun isInstalled(context: Context, modelId: String): Boolean =
-        LocalTranscriptionProvider.isInstalled(context, modelId)
+        LocalCleanupModel.byIdOrNull(modelId)?.let { LocalCleanupModel.isInstalled(context, it) }
+            ?: LocalTranscriptionProvider.isInstalled(context, modelId)
 
     /** Ids of all catalog models currently installed on disk. */
     fun installedIds(context: Context): List<String> =
@@ -80,7 +84,17 @@ object LocalModelManager {
         try {
             val total = spec.totalBytes
             var completed = 0L
-            for (f in spec.files) {
+            spec.archive?.let { archive ->
+                val packed = File(tmpDir, ".model.tar.bz2")
+                downloadFile(
+                    LocalModelFile(archive.url, packed.name, archive.sizeBytes, archive.sha256),
+                    packed, 0L, total, onProgress,
+                )
+                extractArchive(packed, archive, spec.files, tmpDir)
+                check(packed.delete()) { "could not remove downloaded model archive" }
+                completed += archive.sizeBytes
+            }
+            for (f in spec.files.filter { it.destName !in spec.archive?.members.orEmpty().values }) {
                 downloadFile(f, File(tmpDir, f.destName), completed, total, onProgress)
                 completed += f.sizeBytes
                 onProgress(completed, total)
@@ -95,6 +109,67 @@ object LocalModelManager {
         } catch (t: Throwable) {
             tmpDir.deleteRecursively()
             throw t
+        }
+    }
+
+    /** Extract only catalogued regular files. Archive paths never become filesystem paths. */
+    internal suspend fun extractArchive(
+        packed: File,
+        archive: LocalModelArchive,
+        files: List<LocalModelFile>,
+        stagingDir: File,
+    ) {
+        val expected = files.associateBy { it.destName }
+        val found = mutableSetOf<String>()
+        val root = stagingDir.canonicalFile
+        packed.inputStream().buffered().use { raw ->
+            TarArchiveInputStream(BZip2CompressorInputStream(raw)).use { tar ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    coroutineContext.ensureActive()
+                    val entry = tar.nextTarEntry ?: break
+                    val name = archive.members[entry.name] ?: continue
+                    check(found.add(entry.name)) { "duplicate model archive member: ${entry.name}" }
+                    val file = checkNotNull(expected[name]) { "uncatalogued archive destination: $name" }
+                    check(entry.isFile && !entry.isLink && !entry.isSymbolicLink) { "not a regular file: ${entry.name}" }
+                    check(entry.size == file.sizeBytes) { "archive size mismatch for $name" }
+                    val dest = File(root, name).canonicalFile
+                    check(dest.toPath().startsWith(root.toPath()) && dest != root) { "unsafe model destination: $name" }
+                    check(dest.parentFile!!.isDirectory || dest.parentFile!!.mkdirs()) { "cannot create model directory" }
+                    dest.outputStream().buffered().use { output ->
+                        var written = 0L
+                        while (true) {
+                            coroutineContext.ensureActive()
+                            val read = tar.read(buffer)
+                            if (read < 0) break
+                            written += read
+                            check(written <= file.sizeBytes) { "oversized archive member: $name" }
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                    verifyFile(file, dest)
+                }
+            }
+        }
+        check(found == archive.members.keys) { "model archive is missing required files" }
+    }
+
+    private suspend fun verifyFile(file: LocalModelFile, dest: File) {
+        check(dest.length() == file.sizeBytes) { "size mismatch for ${file.destName}" }
+        file.sha256?.let { expected ->
+            val digest = MessageDigest.getInstance("SHA-256")
+            dest.inputStream().buffered().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    coroutineContext.ensureActive()
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            check(digest.digest().joinToString("") { "%02x".format(it) }.equals(expected, ignoreCase = true)) {
+                "checksum mismatch for ${file.destName}"
+            }
         }
     }
 

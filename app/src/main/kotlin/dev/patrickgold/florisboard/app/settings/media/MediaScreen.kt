@@ -88,7 +88,6 @@ import dev.patrickgold.florisboard.R
 import dev.patrickgold.florisboard.app.settings.search.settingsSearchAnchor
 import dev.patrickgold.florisboard.app.FlorisPreferenceStore
 import dev.patrickgold.florisboard.app.enumDisplayEntriesOf
-import dev.patrickgold.florisboard.dictate.gif.GifContentFilter
 import dev.patrickgold.florisboard.dictate.sticker.StickerCategory
 import dev.patrickgold.florisboard.dictate.sticker.StickerHistoryHelper
 import dev.patrickgold.florisboard.dictate.sticker.StickerImports
@@ -134,7 +133,6 @@ fun MediaScreen() = FlorisScreen {
     val prefs by FlorisPreferenceStore
 
     var shouldDelete by remember { mutableStateOf<ShouldDelete?>(null) }
-    var gifSetupOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -272,39 +270,6 @@ fun MediaScreen() = FlorisScreen {
                 max = 10,
                 stepIncrement = 1,
                 enabledIf = { prefs.emoji.suggestionEnabled.isTrue() },
-            )
-        }
-
-        // ----------------------------------------------------------------- GIFs
-        PreferenceGroup(title = stringRes(R.string.prefs__media__gif__title)) {
-            // One row: the on/off switch and the setup walkthrough both live inside the dialog.
-            val gifKey by prefs.gif.klipyApiKey.collectAsState()
-            val gifEnabled by prefs.gif.enabled.collectAsState()
-            Preference(
-                icon = Icons.Outlined.Gif,
-                modifier = Modifier.settingsSearchAnchor("prefs__media__gif_setup__title"),
-                title = stringRes(R.string.prefs__media__gif_setup__title),
-                summary = when {
-                    !gifEnabled -> stringRes(R.string.state__disabled)
-                    gifKey.isBlank() -> stringRes(R.string.prefs__media__gif_setup__summary_unset)
-                    else -> stringRes(R.string.prefs__media__gif_setup__summary_set)
-                },
-                onClick = { gifSetupOpen = true },
-            )
-            // The safe-search level existed since the GIFs did, defaulted to strict, and was neither sent
-            // nor shown (#383). A row of its own: it is not part of setting up the key.
-            ListPreference(
-                prefs.gif.contentFilter,
-                icon = Icons.Outlined.Shield,
-                modifier = Modifier.settingsSearchAnchor("prefs__media__gif_content_filter"),
-                title = stringRes(R.string.prefs__media__gif_content_filter),
-                entries = listPrefEntries {
-                    entry(GifContentFilter.HIGH, stringRes(R.string.prefs__media__gif_content_filter__high))
-                    entry(GifContentFilter.MEDIUM, stringRes(R.string.prefs__media__gif_content_filter__medium))
-                    entry(GifContentFilter.LOW, stringRes(R.string.prefs__media__gif_content_filter__low))
-                    entry(GifContentFilter.OFF, stringRes(R.string.prefs__media__gif_content_filter__off))
-                },
-                enabledIf = { prefs.gif.enabled.isTrue() },
             )
         }
 
@@ -575,112 +540,6 @@ fun MediaScreen() = FlorisScreen {
             }
         },
     )
-
-    if (gifSetupOpen) {
-        GifSetupDialog(
-            initialKey = prefs.gif.klipyApiKey.get(),
-            onSave = { key ->
-                scope.launch { prefs.gif.klipyApiKey.set(key.trim()) }
-                gifSetupOpen = false
-            },
-            onDismiss = { gifSetupOpen = false },
-        )
-    }
-}
-
-/**
- * A short, non-technical walkthrough for setting up GIF search: explains that KLIPY is a free
- * service the user brings their own key for, links to the sign-up page, and lets them paste the key.
- */
-@Composable
-private fun GifSetupDialog(
-    initialKey: String,
-    onSave: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val context = LocalContext.current
-    val prefs by FlorisPreferenceStore
-    val scope = rememberCoroutineScope()
-    val enabled by prefs.gif.enabled.collectAsState()
-    var key by remember { mutableStateOf(initialKey) }
-    var reveal by remember { mutableStateOf(false) }
-    JetPrefAlertDialog(
-        scrollModifier = florisDialogScroll(),
-        title = stringRes(R.string.prefs__media__gif_setup__title),
-        confirmLabel = stringRes(R.string.action__save),
-        dismissLabel = stringRes(R.string.action__cancel),
-        onConfirm = { onSave(key) },
-        onDismiss = onDismiss,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // On/off switch lives here (the settings list has a single row).
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringRes(R.string.prefs__media__gif_enabled),
-                    modifier = Modifier.weight(1f),
-                )
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = { scope.launch { prefs.gif.enabled.set(it) } },
-                )
-            }
-            Text(stringRes(R.string.prefs__media__gif_setup__intro))
-            GifSetupStep(1, stringRes(R.string.prefs__media__gif_setup__step1))
-            GifSetupStep(2, stringRes(R.string.prefs__media__gif_setup__step2))
-            GifSetupStep(3, stringRes(R.string.prefs__media__gif_setup__step3))
-            OutlinedButton(
-                onClick = {
-                    runCatching {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, "https://partner.klipy.com/api-keys".toUri())
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    Icons.Outlined.OpenInNew,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-                Text(stringRes(R.string.prefs__media__gif_setup__open_klipy))
-            }
-            OutlinedTextField(
-                value = key,
-                onValueChange = { key = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringRes(R.string.prefs__media__gif_setup__key_label)) },
-                visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    IconButton(onClick = { reveal = !reveal }) {
-                        Icon(
-                            if (reveal) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                            contentDescription = null,
-                        )
-                    }
-                },
-            )
-            Text(
-                text = stringRes(R.string.prefs__media__gif_setup__privacy_note),
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
-}
-
-@Composable
-private fun GifSetupStep(number: Int, text: String) {
-    Row(verticalAlignment = Alignment.Top) {
-        Text(
-            text = "$number.",
-            modifier = Modifier.padding(end = 8.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
-    }
 }
 
 @Composable

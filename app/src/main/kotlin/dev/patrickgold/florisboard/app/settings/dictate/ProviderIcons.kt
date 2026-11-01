@@ -54,7 +54,7 @@ fun providerIcon(providerId: String): ImageVector {
         "ovhcloud" -> R.drawable.ic_provider_ovhcloud
         "ollama" -> R.drawable.ic_provider_ollama
         // Nothing runs anywhere but here, so the phone is the mark.
-        "local" -> return Icons.Default.PhoneAndroid
+        "local", "local-cleanup" -> return Icons.Default.PhoneAndroid
         else -> return Icons.Default.Cloud
     }
     return ImageVector.vectorResource(drawable)

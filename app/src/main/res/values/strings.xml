@@ -2480,6 +2480,27 @@
     <!-- Dictate rewording (AI) settings -->
     <string name="dictate__rewording_group" comment="Group title for the rewording (AI editing) stage on the main Dictate screen">Rewording (AI editing)</string>
     <string name="dictate__rewording_title" comment="Title of the rewording settings screen">Rewording (AI)</string>
+    <string name="dictate__local_cleanup_running">Cleaning up on-device…</string>
+    <string name="dictate__cleanup_title">Cleanup</string>
+    <string name="dictate__stats_text_passes">AI text passes</string>
+    <string name="dictate__models_summary_both">Speech: {transcription} · Cleanup: {cleanup}</string>
+    <string name="dictate__cleanup_failed">Cleanup failed; the original transcript was kept.</string>
+    <string name="dictate__cleanup_enabled_title">Clean up transcripts</string>
+    <string name="dictate__cleanup_enabled_summary">Run one on-device cleanup pass after speech recognition. If cleanup fails, keep the original transcript.</string>
+    <string name="dictate__cleanup_prompt_title">Cleanup prompt</string>
+    <string name="dictate__cleanup_prompt_default">Model default</string>
+    <string name="dictate__cleanup_prompt_custom">Personalized prompt</string>
+    <string name="dictate__cleanup_prompt_placeholder">Enter your cleanup instruction</string>
+    <string name="dictate__cleanup_prompt_active">Active cleanup prompt</string>
+    <string name="dictate__cleanup_prompt_help">A personalized prompt replaces the model default only when selected and nonempty. An empty field uses the model default. Personalized mode also bypasses the default hesitation filter. Longer prompts can slow cleanup. Qwen3.5 GEC was trained with its Russian default; changing it may reduce accuracy.</string>
+    <string name="dictate__local_cleanup_editing_unsupported">The selected model supports proofreading only, not editing prompts or spoken commands. Choose an instruction-following model in On-device models to use these actions. Your text and model selection have not been changed.</string>
+    <string name="dictate__local_cleanup_description">On-device text cleanup using Qwen3 or Qwen3.5. Download and select a model here, then enable Cleanup. Dictation runs one proofreading pass using the model default or your selected personalized prompt. CPU only; uses extra memory and may take a few seconds. Errors keep the original transcript. AI can still make mistakes.</string>
+    <string name="dictate__local_cleanup_choice">The 0.6B model is smaller and faster; the 0.8B GEC model is tuned for spelling and grammar. The 1.7B model has more headroom for difficult transcripts. All run offline.</string>
+    <string name="dictate__local_cleanup_unsupported">Local text cleanup currently requires an ARM64 Android device.</string>
+    <string name="dictate__local_models_title">On-device models</string>
+    <string name="dictate__local_models_intro">Speech recognition and text cleanup run on this phone. No audio or text is sent to a cloud service.</string>
+    <string name="dictate__local_speech_title">Speech recognition</string>
+    <string name="dictate__local_cleanup_title">Text cleanup</string>
     <string name="dictate__reasoning_effort_title" comment="Title of the reasoning-effort setting (only affects reasoning models like o-series/GPT-5/Grok)">Reasoning effort</string>
     <string name="dictate__reasoning_effort_off" comment="Reasoning-effort option: off / provider default">Off</string>
     <string name="dictate__reasoning_effort_off_summary" comment="Summary for the off reasoning-effort option">Provider default — leave off for non-reasoning models</string>

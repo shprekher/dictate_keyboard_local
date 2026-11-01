@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.DocumentScanner
-import androidx.compose.material.icons.outlined.Gif
 import org.florisboard.lib.compose.icons.Sticker
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.patrickgold.florisboard.R
@@ -54,7 +53,6 @@ enum class LegacyEditAction {
     LANGUAGE,
     HISTORY,
     REINSERT,
-    GIF,
     STICKER,
     CLIPBOARD,
     SWITCH,
@@ -84,7 +82,6 @@ enum class LegacyEditAction {
             LANGUAGE -> Icons.Default.Language
             HISTORY -> Icons.Default.History
             REINSERT -> Icons.Default.Replay
-            GIF -> Icons.Outlined.Gif
             STICKER -> Icons.Outlined.Sticker
             CLIPBOARD -> Icons.AutoMirrored.Outlined.Assignment
             SWITCH -> Icons.Default.KeyboardHide
@@ -109,7 +106,6 @@ enum class LegacyEditAction {
             LANGUAGE -> R.string.dictate__legacy_action_language
             HISTORY -> R.string.dictate__legacy_action_history
             REINSERT -> R.string.dictate__legacy_action_reinsert
-            GIF -> R.string.dictate__legacy_action_gif
             STICKER -> R.string.sticker__title
             CLIPBOARD -> R.string.clipboard__header_title
             SWITCH -> R.string.dictate__legacy_action_switch

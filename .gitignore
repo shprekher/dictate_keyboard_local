@@ -105,3 +105,6 @@ cloud/.wrangler/
 .wrangler/
 cloud/.dev.vars
 cloud/dist/
+
+# Dictate: signing keystore directory (must never be published)
+DictateKeyboard-signing/

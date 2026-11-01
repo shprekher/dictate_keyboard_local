@@ -17,6 +17,7 @@ import com.k2fsa.sherpa.onnx.OfflineDolphinModelConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineQwen3AsrModelConfig
 import com.k2fsa.sherpa.onnx.OfflineSenseVoiceModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
@@ -80,6 +81,7 @@ class LocalTranscriptionProvider(
 
     /** When the current decode started, as a [System.nanoTime] stamp. Set once per [transcribe] call. */
     private var startedNanos: Long = 0L
+    private var qwenLanguageHint: String = ""
 
     /**
      * How long a stretch this model may be given in one decode — see [LocalModelSpec.maxSegmentSeconds].
@@ -152,6 +154,13 @@ class LocalTranscriptionProvider(
             // Honor the user's chosen input language like the cloud providers do; null/blank → Whisper
             // auto-detect. Whisper expects the base ISO code (e.g. "de"), so drop any region suffix.
             val language = request.language?.substringBefore('-')?.takeIf { it.isNotBlank() }.orEmpty()
+            qwenLanguageHint = if (LocalModelCatalog.kindOf(modelDir.name) == LocalModelKind.QWEN3_ASR) {
+                when (language.lowercase()) {
+                    "en" -> "English"
+                    "ru" -> "Russian"
+                    else -> "" // Unset/other languages retain Qwen's automatic detection.
+                }
+            } else ""
 
             if (streaming) {
                 return@withContext TranscriptionResult(tightened(transcribeStreaming(samples)))
@@ -244,8 +253,13 @@ class LocalTranscriptionProvider(
 
     /** Single whole-buffer Whisper pass (fine for clips up to ~30 s). */
     private fun decodeOnce(recognizer: OfflineRecognizer, samples: FloatArray): String {
+        // Qwen's 512-token context must also be respected if the VAD finds no speech or is missing.
+        if (LocalModelCatalog.kindOf(modelDir.name) == LocalModelKind.QWEN3_ASR && samples.size > maxSegmentSamples) {
+            return StringBuilder().also { appendDecoded(recognizer, samples, it) }.toString()
+        }
         val stream = recognizer.createStream()
         return try {
+            if (qwenLanguageHint.isNotEmpty()) stream.setOption("language", qwenLanguageHint)
             stream.acceptWaveform(samples, AudioDecode.TARGET_SAMPLE_RATE)
             recognizer.decode(stream)
             recognizer.getResult(stream).text
@@ -345,6 +359,7 @@ class LocalTranscriptionProvider(
         const val ENCODER = "encoder.onnx"
         const val DECODER = "decoder.onnx"
         const val TOKENS = "tokens.txt"
+        const val CONV_FRONTEND = "conv_frontend.onnx"
 
         /**
          * The single model file of a one-piece recognizer (SenseVoice, issue #262), which has no
@@ -404,8 +419,19 @@ class LocalTranscriptionProvider(
          * (it is then freed only on memory pressure). Applied after the current/next transcription.
          */
         fun setIdleUnloadMillis(millis: Long) {
-            RecognizerCache.idleUnloadMillis = millis
-            OnlineRecognizerCache.idleUnloadMillis = millis
+            RecognizerCache.setRetention(millis)
+            OnlineRecognizerCache.setRetention(millis)
+        }
+
+        /** Only maps the selected recognizer; no recording or transcription is performed. */
+        fun preload(context: Context, modelId: String, language: String?) {
+            if (!isInstalled(context, modelId)) return
+            val dir = modelDir(context, modelId)
+            if (LocalModelCatalog.isStreaming(modelId)) {
+                OnlineRecognizerCache.preloadIfIdle(dir, 2)
+            } else {
+                RecognizerCache.preloadIfIdle(dir, 2, language?.substringBefore('-').orEmpty())
+            }
         }
     }
 }
@@ -431,13 +457,23 @@ private object RecognizerCache {
         Thread(r, "stt-idle-unload").apply { isDaemon = true }
     }
     private var idleFuture: ScheduledFuture<*>? = null
+    private var idleGeneration = 0L
+
+    @Synchronized
+    fun setRetention(millis: Long) {
+        idleUnloadMillis = millis.coerceAtLeast(0)
+        if (activeUsers == 0) armIdle()
+    }
+
+    @Synchronized
+    fun preloadIfIdle(modelDir: File, numThreads: Int, language: String) {
+        if (activeUsers > 0) return
+        acquire(modelDir, numThreads, language)
+        endUse()
+    }
 
     @Synchronized
     fun acquire(modelDir: File, numThreads: Int, language: String): OfflineRecognizer {
-        // In use again → cancel any pending idle unload.
-        idleFuture?.cancel(false)
-        idleFuture = null
-
         val encoder = File(modelDir, LocalTranscriptionProvider.ENCODER)
         val decoder = File(modelDir, LocalTranscriptionProvider.DECODER)
         val tokens = File(modelDir, LocalTranscriptionProvider.TOKENS)
@@ -451,8 +487,14 @@ private object RecognizerCache {
         // key (switching the input language rebuilds the recognizer; ~1s). A transducer decodes the audio
         // as-is and ignores the language, and Dolphin's config has no language field at all, so it stays
         // out of the key for those — otherwise switching languages would throw the model away for nothing.
-        val languageless = kind == LocalModelKind.NEMO_TRANSDUCER || kind == LocalModelKind.DOLPHIN
+        // Qwen's language hint is set per stream, not baked into the cached recognizer.
+        val languageless = kind == LocalModelKind.NEMO_TRANSDUCER || kind == LocalModelKind.DOLPHIN ||
+            kind == LocalModelKind.QWEN3_ASR
         val cacheKey = modelDir.absolutePath + "|" + (if (languageless) "" else language)
+        check(activeUsers == 0 || key == cacheKey) { "The speech model is still in use" }
+        idleFuture?.cancel(false)
+        idleFuture = null
+        idleGeneration++
         val existing = recognizer
         val rec = if (existing != null && cacheKey == key) {
             existing
@@ -466,7 +508,7 @@ private object RecognizerCache {
             }
         }
         // A fresh use cancels any pending unload for the now-current model and marks it in use.
-        releasePending = false
+        if (activeUsers == 0) releasePending = false
         activeUsers++
         return rec
     }
@@ -492,6 +534,7 @@ private object RecognizerCache {
     }
 
     private fun freeNow() {
+        idleGeneration++
         idleFuture?.cancel(false)
         idleFuture = null
         recognizer?.release()
@@ -501,11 +544,14 @@ private object RecognizerCache {
     }
 
     private fun armIdle() {
+        val generation = ++idleGeneration
         idleFuture?.cancel(false)
         idleFuture = null
         val delay = idleUnloadMillis
         if (delay > 0 && recognizer != null) {
-            idleFuture = scheduler.schedule({ unload() }, delay, TimeUnit.MILLISECONDS)
+            idleFuture = scheduler.schedule({
+                synchronized(this) { if (generation == idleGeneration && activeUsers == 0) freeNow() }
+            }, delay, TimeUnit.MILLISECONDS)
         }
     }
 
@@ -574,6 +620,20 @@ private object RecognizerCache {
                 dolphin = OfflineDolphinModelConfig(model = model.absolutePath),
                 tokens = tokens.absolutePath,
                 numThreads = numThreads,
+            )
+            LocalModelKind.QWEN3_ASR -> OfflineModelConfig(
+                qwen3Asr = OfflineQwen3AsrModelConfig(
+                    convFrontend = File(encoder.parentFile, LocalTranscriptionProvider.CONV_FRONTEND).absolutePath,
+                    encoder = encoder.absolutePath,
+                    decoder = decoder.absolutePath,
+                    tokenizer = File(encoder.parentFile, "tokenizer").absolutePath,
+                    maxTotalLen = 512,
+                    maxNewTokens = 256,
+                    temperature = 0.000001f, // Greedy/deterministic decoding, as in the upstream example.
+                ),
+                numThreads = numThreads,
+                provider = "cpu",
+                // No tokens.txt: Qwen uses its BPE tokenizer and creates its own 128-mel stream.
             )
             LocalModelKind.WHISPER -> OfflineModelConfig(
                 whisper = OfflineWhisperModelConfig(

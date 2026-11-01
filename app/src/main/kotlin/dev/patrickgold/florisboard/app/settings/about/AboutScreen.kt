@@ -55,8 +55,6 @@ import dev.patrickgold.florisboard.R
 import dev.patrickgold.florisboard.app.settings.search.settingsSearchAnchor
 import dev.patrickgold.florisboard.app.LocalNavController
 import dev.patrickgold.florisboard.app.Routes
-import dev.patrickgold.florisboard.app.WHATS_NEW_TOURS
-import dev.patrickgold.florisboard.app.WhatsNewTourState
 import dev.patrickgold.florisboard.clipboardManager
 import dev.patrickgold.florisboard.lib.compose.FlorisScreen
 import dev.patrickgold.florisboard.lib.util.launchUrl
@@ -118,99 +116,6 @@ fun AboutScreen() = FlorisScreen {
                     ).show()
                 }
             },
-        )
-        // A single "What's new" entry that opens a small version picker, so users on any prior version can
-        // re-view every release's tour without cluttering the list. (Auto-show on update still jumps
-        // straight to the updated version — see WhatsNewTour / pendingTourVersions.)
-        var showWhatsNewPicker by remember { mutableStateOf(false) }
-        Preference(
-            icon = Icons.Default.AutoAwesome,
-            modifier = Modifier.settingsSearchAnchor("about__whats_new__title"),
-            title = stringRes(R.string.about__whats_new__title),
-            summary = stringRes(R.string.about__whats_new__summary),
-            onClick = { showWhatsNewPicker = true },
-        )
-        if (showWhatsNewPicker) {
-            AlertDialog(
-                onDismissRequest = { showWhatsNewPicker = false },
-                title = { Text(stringRes(R.string.about__whats_new__title)) },
-                text = {
-                    // Newest first; the registry is ascending, so reverse for display.
-                    Column {
-                        WHATS_NEW_TOURS.reversed().forEach { tour ->
-                            val versionLabel = tour.version.toString().substringBeforeLast(".0")
-                            Text(
-                                text = stringRes(R.string.about__whats_new__versioned)
-                                    .replace("{version}", versionLabel),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        showWhatsNewPicker = false
-                                        WhatsNewTourState.open(tour.version)
-                                    }
-                                    .padding(vertical = 14.dp),
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showWhatsNewPicker = false }) {
-                        Text(stringRes(R.string.action__cancel))
-                    }
-                },
-            )
-        }
-        Preference(
-            icon = Icons.Outlined.Public,
-            modifier = Modifier.settingsSearchAnchor("about__website__title"),
-            title = stringRes(R.string.about__website__title),
-            summary = "dictatekeyboard.com",
-            onClick = { context.launchUrl(R.string.florisboard__website_url) },
-        )
-        Preference(
-            icon = Icons.Default.History,
-            modifier = Modifier.settingsSearchAnchor("about__changelog__title"),
-            title = stringRes(R.string.about__changelog__title),
-            summary = stringRes(R.string.about__changelog__summary),
-            onClick = { context.launchUrl(R.string.florisboard__changelog_url, "version" to BuildConfig.VERSION_NAME) },
-        )
-        Preference(
-            icon = Icons.Default.Code,
-            modifier = Modifier.settingsSearchAnchor("about__repository__title"),
-            title = stringRes(R.string.about__repository__title),
-            summary = stringRes(R.string.about__repository__summary),
-            onClick = { context.launchUrl(R.string.florisboard__repo_url) },
-        )
-        Preference(
-            icon = Icons.Default.CallSplit,
-            modifier = Modifier.settingsSearchAnchor("about__based_on_floris__title"),
-            title = stringRes(R.string.about__based_on_floris__title),
-            summary = stringRes(R.string.about__based_on_floris__summary),
-            onClick = { context.launchUrl(R.string.florisboard__upstream_repo_url) },
-        )
-        Preference(
-            icon = Icons.Outlined.Email,
-            modifier = Modifier.settingsSearchAnchor("about__feedback__title"),
-            title = stringRes(R.string.about__feedback__title),
-            summary = stringRes(R.string.about__feedback__summary),
-            onClick = {
-                val email = context.stringRes(R.string.about__feedback__email)
-                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")).apply {
-                    putExtra(Intent.EXTRA_SUBJECT, context.stringRes(R.string.about__feedback__subject))
-                }
-                try {
-                    context.startActivity(intent)
-                } catch (e: Throwable) {
-                    Toast.makeText(context, email, Toast.LENGTH_LONG).show()
-                }
-            },
-        )
-        Preference(
-            icon = Icons.Outlined.Policy,
-            modifier = Modifier.settingsSearchAnchor("about__privacy_policy__title"),
-            title = stringRes(R.string.about__privacy_policy__title),
-            summary = stringRes(R.string.about__privacy_policy__summary),
-            onClick = { context.launchUrl(R.string.florisboard__privacy_policy_url) },
         )
         Preference(
             icon = Icons.Outlined.Description,

@@ -58,7 +58,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Spellcheck
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Vibration
-import androidx.compose.material.icons.filled.ViewAgenda
+
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -102,6 +102,7 @@ import dev.patrickgold.florisboard.dictate.provider.LocalModelDownloads
 import dev.patrickgold.florisboard.dictate.data.prompts.DictatePromptDefaults
 import dev.patrickgold.florisboard.dictate.provider.ProviderAccounts
 import dev.patrickgold.florisboard.dictate.provider.ProviderRegistry
+import dev.patrickgold.florisboard.dictate.provider.chatModelFor
 import dev.patrickgold.florisboard.lib.compose.FlorisScreen
 import org.florisboard.lib.compose.florisDialogScroll
 import org.florisboard.lib.compose.stringRes
@@ -128,15 +129,14 @@ fun DictateScreen() = FlorisScreen {
         // The active providers' display names, for the summary of the providers row. Show both the
         // transcription and (when rewording is on) the rewording provider, since they are configured
         // independently and often differ — the row previously surfaced only the transcription one.
-        val transcriptionProviderId by prefs.dictate.transcriptionProviderId.collectAsState()
-        val rewordingProviderId by prefs.dictate.rewordingProviderId.collectAsState()
-        val rewordingEnabled by prefs.dictate.rewordingEnabled.collectAsState()
+        val cleanupEnabled by prefs.dictate.cleanupEnabled.collectAsState()
         val accounts by prefs.dictate.providerAccounts.collectAsState()
-        val transcriptionName = remember(transcriptionProviderId, accounts) {
-            providerDisplayName(transcriptionProviderId, accounts)
+        val transcriptionName = remember(accounts) {
+            accounts.getOrEmpty(ProviderRegistry.LOCAL.id).transcriptionModel
+                .ifBlank { ProviderRegistry.LOCAL.defaultTranscriptionModel.orEmpty() }
         }
-        val rewordingName = remember(rewordingProviderId, accounts) {
-            providerDisplayName(rewordingProviderId, accounts)
+        val rewordingName = remember(accounts) {
+            chatModelFor(accounts.getOrEmpty(ProviderRegistry.LOCAL_CLEANUP.id), ProviderRegistry.LOCAL_CLEANUP)
         }
 
         Preference(
@@ -177,14 +177,14 @@ fun DictateScreen() = FlorisScreen {
         // then changes when something is wrong, while the layout is a matter of taste that most people
         // never touch.
         Preference(
-            icon = Icons.Default.Cloud,
+            icon = Icons.Default.ModelTraining,
             modifier = Modifier.settingsSearchAnchor("dictate__providers_title"),
-            title = stringRes(R.string.dictate__providers_title),
-            summary = if (rewordingEnabled && transcriptionName != rewordingName) {
+            title = stringRes(R.string.dictate__local_models_title),
+            summary = if (cleanupEnabled && transcriptionName != rewordingName) {
                 stringRes(
-                    R.string.dictate__providers_summary_both,
+                    R.string.dictate__models_summary_both,
                     "transcription" to transcriptionName,
-                    "rewording" to rewordingName,
+                    "cleanup" to rewordingName,
                 )
             } else {
                 stringRes(R.string.dictate__providers_summary, "provider" to transcriptionName)
@@ -228,13 +228,10 @@ fun DictateScreen() = FlorisScreen {
 
         Preference(
             icon = Icons.Default.AutoAwesome,
-            modifier = Modifier.settingsSearchAnchor("dictate__rewording_title"),
-            title = stringRes(R.string.dictate__rewording_title),
-            summary = stringRes(
-                if (rewordingEnabled) R.string.dictate__rewording_summary_on
-                else R.string.dictate__rewording_summary_off,
-            ),
-            onClick = { navController.navigate(Routes.Settings.DictateRewording) },
+            modifier = Modifier.settingsSearchAnchor("dictate__cleanup_title"),
+            title = stringRes(R.string.dictate__cleanup_title),
+            summary = stringRes(R.string.dictate__cleanup_enabled_summary),
+            onClick = { navController.navigate(Routes.Settings.DictateCleanup) },
         )
 
         Preference(
@@ -268,13 +265,6 @@ fun DictateScreen() = FlorisScreen {
             },
         )
 
-        Preference(
-            icon = Icons.Default.Watch,
-            modifier = Modifier.settingsSearchAnchor("dictate__wear_title"),
-            title = stringRes(R.string.dictate__wear_title),
-            summary = stringRes(R.string.dictate__wear_summary),
-            onClick = { navController.navigate(Routes.Settings.DictateWear) },
-        )
     }
 }
 
@@ -627,16 +617,6 @@ fun DictateLayoutScreen() = FlorisScreen {
 
         // The layout customisation only makes sense once the classic layout is actually in use (#183/#194).
         if (legacyMode != DictateLegacyLayout.OFF) {
-            ListPreference(
-                prefs.dictate.legacyPromptRows,
-                icon = Icons.Default.ViewAgenda,
-                modifier = Modifier.settingsSearchAnchor("dictate__legacy_prompt_rows_title"),
-                title = stringRes(R.string.dictate__legacy_prompt_rows_title),
-                entries = listPrefEntries {
-                    entry(key = 1, label = stringRes(R.string.dictate__legacy_prompt_rows_one))
-                    entry(key = 2, label = stringRes(R.string.dictate__legacy_prompt_rows_two))
-                },
-            )
             LegacyActionRowSetting()
             EnterLongPressCharsSetting()
         }

@@ -10,11 +10,9 @@
 
 package dev.patrickgold.florisboard.ime.theme
 
-import dev.patrickgold.florisboard.dictate.ui.HIGHLIGHT_WASH_ALPHA
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.datatest.withData
 import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.doubles.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -52,9 +50,6 @@ import kotlin.math.roundToInt
  *   written against `var(--primary)` is therefore a guarantee about a colour a stranger chooses. The
  *   pair uses `--accent`/`--on-accent`, which nothing rewrites, and this test holds it to that.
  *
- * - **The one colour the theme cannot own** is the highlight wash the prompt strip paints over a tile
- *   ([HIGHLIGHT_WASH_ALPHA] of the user's accent). That one is checked against its worst case rather
- *   than against the default accent, because the user can pick black.
  */
 class HighContrastThemeTest : FunSpec({
     val themeDir: File = run {
@@ -125,19 +120,6 @@ class HighContrastThemeTest : FunSpec({
         }
     }
 
-    context("the prompt strip's accent wash cannot drag a tile label under 7:1, whatever accent is picked") {
-        withData(sheets.keys) { id ->
-            val sheet = sheets.getValue(id)
-            val tile = sheet.effective("smartbar-action-tile", "background")!!
-            val label = sheet.effective("smartbar-action-tile", "foreground")!!
-            // The user owns this colour, so the check is over the two extremes it can reach, not over
-            // the accent that happens to be the default.
-            for (accent in listOf("#000000", "#ffffff")) {
-                val washed = blend(accent, tile, HIGHLIGHT_WASH_ALPHA)
-                contrast(label, washed) shouldBeGreaterThanOrEqual 7.0
-            }
-        }
-    }
 
     context("nothing that carries text is translucent, and no surface is an image") {
         withData(sheets.keys) { id ->
@@ -262,15 +244,5 @@ private fun contrast(a: String, b: String): Double {
     return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 }
 
-/** [top] painted over [bottom] at [alpha], in sRGB space — the way Compose draws a translucent fill. */
-private fun blend(top: String, bottom: String, alpha: Float): String {
-    val t = top.removePrefix("#")
-    val b = bottom.removePrefix("#")
-    return (0..2).joinToString("", prefix = "#") { i ->
-        val tc = t.substring(i * 2, i * 2 + 2).toInt(16)
-        val bc = b.substring(i * 2, i * 2 + 2).toInt(16)
-        "%02x".format((tc * alpha + bc * (1 - alpha)).roundToInt())
-    }
-}
 
 private fun Double.round() = (this * 100).roundToInt() / 100.0

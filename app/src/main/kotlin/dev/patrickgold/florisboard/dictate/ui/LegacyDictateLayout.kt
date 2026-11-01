@@ -252,19 +252,10 @@ fun LegacyDictateLayout(
     val context = LocalContext.current
     val keyboardManager by context.keyboardManager()
     val prefs by FlorisPreferenceStore
-    val prompts by DictateController.prompts.collectAsState()
     val dictateState by DictateController.state.collectAsState()
     val accent by prefs.theme.accentColor.collectAsState()
-    val rewordingEnabled by prefs.dictate.rewordingEnabled.collectAsState()
-    val promptRows by prefs.dictate.legacyPromptRows.collectAsState()
 
     // Keep the screen awake while recording so the auto-timeout can't cut the recording short. The modern
-
-    // The Smartbar (which normally loads the prompts) is replaced by this layout, so trigger the load
-    // here whenever the panel appears / rewording toggles.
-    LaunchedEffect(rewordingEnabled) {
-        if (rewordingEnabled) DictateController.refreshPrompts(context)
-    }
 
     var overlay by remember { mutableStateOf(LegacyOverlay.NONE) }
 
@@ -274,30 +265,18 @@ fun LegacyDictateLayout(
             LegacyOverlay.NONE -> Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = KeyMarginH, vertical = KeyMarginV),
             ) {
-                // Row 1: normally the prompt strip (when rewording is on), but it doubles as the status
-                // surface – errors, the interrupted-recording chip and the rate/donate/milestone promos
-                // reuse the same DictateSmartbarUi the main keyboard shows, so all of those work here too.
+                // Status surface for errors and the interrupted-recording chip. The old prompt row was
+                // removed: it consumed a full row above the keys without being used in practice.
                 val showStatus = dictateState is DictateController.UiState.Error ||
-                    dictateState is DictateController.UiState.Interrupted ||
-                    dictateState is DictateController.UiState.Promo
-                if (showStatus || rewordingEnabled) {
-                    // Status chips stay one row tall; the prompt strip can be one or two rows (#194).
-                    val stripHeight = when {
-                        showStatus -> FlorisImeSizing.smartbarHeight * 1.2f
-                        promptRows >= 2 -> FlorisImeSizing.smartbarHeight * 2.4f
-                        else -> FlorisImeSizing.smartbarHeight * 1.2f
-                    }
+                    dictateState is DictateController.UiState.Interrupted
+                if (showStatus) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(stripHeight)
+                            .height(FlorisImeSizing.smartbarHeight * 1.2f)
                             .padding(bottom = KeyMarginV),
                     ) {
-                        if (showStatus) {
-                            DictateSmartbarUi(dictateState, modifier = Modifier.fillMaxSize())
-                        } else {
-                            DictatePromptRow(prompts, modifier = Modifier.fillMaxSize(), rows = promptRows)
-                        }
+                        DictateSmartbarUi(dictateState, modifier = Modifier.fillMaxSize())
                     }
                 }
 
@@ -480,9 +459,6 @@ private fun LegacyActionKey(
         LegacyEditAction.NUMBERS -> ThemedIconKey(KeyCode.VIEW_NUMERIC, action.icon, label, modifier, onClick = onNumbers)
         LegacyEditAction.HISTORY -> ThemedIconKey(KeyCode.NOOP, action.icon, label, modifier) {
             keyboardManager.activeState.imeUiMode = ImeUiMode.HISTORY
-        }
-        LegacyEditAction.GIF -> ThemedIconKey(KeyCode.NOOP, action.icon, label, modifier) {
-            keyboardManager.activeState.imeUiMode = ImeUiMode.GIF
         }
         LegacyEditAction.STICKER -> ThemedIconKey(KeyCode.NOOP, action.icon, label, modifier) {
             keyboardManager.activeState.imeUiMode = ImeUiMode.STICKER
@@ -748,7 +724,7 @@ private fun LegacyRecordRow(
                         // A trailing stop icon signals a tap cancels the request (issue #192).
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), color = onAccent, strokeWidth = 2.dp)
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text(text = rewording.label.ifBlank { stringRes(R.string.dictate__status_rewording) }, color = onAccent)
+                        Text(text = rewording.label.ifBlank { stringRes(R.string.dictate__local_cleanup_running) }, color = onAccent)
                         Spacer(modifier = Modifier.width(10.dp))
                         Icon(Icons.Default.Stop, contentDescription = null, tint = onAccent, modifier = Modifier.size(20.dp))
                     }

@@ -16,7 +16,7 @@ import dev.patrickgold.florisboard.dictate.ui.LegacyEditAction.Companion.MAX_PER
 import dev.patrickgold.florisboard.dictate.ui.LegacyEditAction.Companion.MAX_TOTAL
 
 /** The first [n] actions of the enum — a list of a given length whose contents don't matter. */
-private fun some(n: Int) = LegacyEditAction.entries.take(n)
+private fun some(n: Int) = List(n) { LegacyEditAction.entries[it % LegacyEditAction.entries.size] }
 
 class LegacyEditActionTest : FunSpec({
     context("wrapping onto a second row (#226)") {
@@ -70,7 +70,7 @@ class LegacyEditActionTest : FunSpec({
             val arrangement = listOf(
                 LegacyEditAction.SCAN,
                 LegacyEditAction.HISTORY,
-                LegacyEditAction.GIF,
+                LegacyEditAction.STICKER,
                 LegacyEditAction.EDITING,
             )
             LegacyEditAction.parse(LegacyEditAction.serialize(arrangement)) shouldBe arrangement
@@ -79,6 +79,10 @@ class LegacyEditActionTest : FunSpec({
         test("an unknown name is skipped rather than failing the whole row") {
             LegacyEditAction.parse("UNDO,WAKE_ON_LAN,REDO") shouldBe
                 listOf(LegacyEditAction.UNDO, LegacyEditAction.REDO)
+        }
+
+        test("an old GIF action is dropped without losing adjacent actions") {
+            LegacyEditAction.parse("UNDO,GIF,REDO") shouldBe listOf(LegacyEditAction.UNDO, LegacyEditAction.REDO)
         }
 
         test("whitespace around a name is tolerated") {
@@ -97,7 +101,7 @@ class LegacyEditActionTest : FunSpec({
 
         test("more buttons than fit are cut to what the layout can draw") {
             val tooMany = LegacyEditAction.entries.joinToString(",") { it.name } + ",UNDO,REDO"
-            LegacyEditAction.parse(tooMany).size shouldBe MAX_TOTAL
+            LegacyEditAction.parse(tooMany).size shouldBe minOf(MAX_TOTAL, LegacyEditAction.entries.size)
         }
     }
 

@@ -93,12 +93,8 @@ import dev.patrickgold.florisboard.app.settings.dictate.rememberAudioPlayer
 import dev.patrickgold.florisboard.dictate.DictateLanguages
 import dev.patrickgold.florisboard.dictate.data.history.DictateHistorySource
 import dev.patrickgold.florisboard.dictate.data.history.DictateHistoryStore
-import dev.patrickgold.florisboard.dictate.data.prompts.PromptModel
-import dev.patrickgold.florisboard.dictate.data.prompts.PromptsDatabaseHelper
-import dev.patrickgold.florisboard.dictate.data.prompts.snippetBody
 import dev.patrickgold.florisboard.dictate.dictateProxyConfig
 import dev.patrickgold.florisboard.dictate.provider.DictateRewording
-import dev.patrickgold.florisboard.dictate.provider.OpenAiCompatibleClient
 import dev.patrickgold.florisboard.dictate.provider.ProviderRegistry
 import dev.patrickgold.florisboard.dictate.provider.TranscriptionApi
 import dev.patrickgold.florisboard.dictate.provider.chatModelFor
@@ -132,7 +128,6 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
     var info by remember { mutableStateOf<SharedFileInfo?>(null) }
     var text by remember { mutableStateOf("") }
     /** The transcript before a prompt rewrote it — both stay visible, as in the history (#240). */
-    var original by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(true) }
     /** The one-line note for a rewording running over a transcript that is already on screen. */
     var status by remember { mutableStateOf("") }
@@ -152,12 +147,10 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
         )
     }
     var job by remember { mutableStateOf<Job?>(null) }
-    val prompts = remember { mutableStateOf<List<PromptModel>>(emptyList()) }
 
     val skipped = (uris.size - 1).coerceAtLeast(0)
     /** Whether the failure is one the provider settings can fix, rather than a network hiccup. */
     var needsKey by remember { mutableStateOf(false) }
-    var promptMenuOpen by remember { mutableStateOf(false) }
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var activeMatch by remember { mutableStateOf(0) }
@@ -203,7 +196,7 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
         val account = ImportTranscriber.accountFor(prefs)
         val preset = ImportTranscriber.presetFor(account)
         providerLabel = account.displayName.ifBlank { preset.displayName }
-        onDeviceProvider = preset.transcriptionApi == TranscriptionApi.LOCAL_ONDEVICE
+        onDeviceProvider = true
     }
 
     fun run() {
@@ -215,26 +208,15 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
         // did. Kept on screen, the old text sat under a "Rewording…" line that described nothing that was
         // happening — and after a language switch it is the wrong language anyway.
         text = ""
-        original = ""
         searching = false
         query = ""
         val lang = language
-        val account = ImportTranscriber.accountFor(prefs)
-        val preset = ImportTranscriber.presetFor(account)
         refreshProvider()
-        if (account.apiKey.isBlank() && preset.transcriptionApi != TranscriptionApi.LOCAL_ONDEVICE) {
-            // Checked before the file is touched: failing at the upload would say the same thing three
-            // seconds later and with a worse message.
-            busy = false
-            needsKey = true
-            error = context.getString(R.string.dictate__error_no_api_key)
-            return
-        }
         busy = true
         // Retry arrives here too, with the copy long finished, so the line starts at the first step
         // that still has work in it. The transcriber overwrites this on its own within a moment.
         progress = ImportProgress(
-            if (ImportTranscriber.preparesFor(file, account.providerId, onDeviceProvider)) {
+            if (ImportTranscriber.preparesFor(file, ProviderRegistry.LOCAL.id, true)) {
                 ImportStage.PREPARE
             } else if (onDeviceProvider) {
                 ImportStage.TRANSCRIBE
@@ -247,7 +229,6 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
             try {
                 val result = ImportTranscriber.transcribe(context, prefs, file, lang) { report(it) }
                 progress = ImportProgress(ImportStage.FINISH)
-                original = ""
                 // Kept like every other dictation, so closing this screen does not lose the transcript.
                 // Wrapped, because a history write that fails must not take the transcript with it: the
                 // text is the thing the user came for, the log entry is bookkeeping.
@@ -344,35 +325,9 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
         }
         audio = copied.first
         info = copied.second
-        prompts.value = withContext(Dispatchers.IO) {
-            // Snippets insert literal text and have nothing to say about a transcript.
-            PromptsDatabaseHelper.getInstance(context).getAll().filter { it.snippetBody() == null }
-        }
         run()
     }
 
-    fun applyPrompt(prompt: PromptModel) {
-        val body = prompt.prompt?.takeIf { it.isNotBlank() } ?: return
-        job?.cancel()
-        error = null
-        busy = true
-        status = context.getString(R.string.dictate__status_rewording)
-        job = scope.launch {
-            try {
-                val before = text
-                val result = rewordWith(context, body, before)
-                original = before
-                text = result
-            } catch (c: CancellationException) {
-                throw c
-            } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.dictate__notice_rewording_failed)
-            } finally {
-                busy = false
-                status = ""
-            }
-        }
-    }
 
     /*
      * Two arrangements out of the same pieces.
@@ -471,7 +426,7 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
             ) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 Text(
-                    text = status.ifBlank { stringRes(R.string.dictate__status_rewording) },
+                    text = status.ifBlank { stringRes(R.string.dictate__local_cleanup_running) },
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
                 )
@@ -500,11 +455,7 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
                 Footer(
                     busy = busy,
                     twoPerRow = landscape,
-                    prompts = prompts.value,
-                    canRevert = original.isNotEmpty(),
-                    menuOpen = promptMenuOpen,
                     copied = copied,
-                    onMenu = { promptMenuOpen = it },
                     onCopy = {
                         copyToClipboard(context, text)
                         copied = true
@@ -513,8 +464,6 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
                     onRetry = { run() },
                     onSave = { saveLauncher.launch((info?.displayName ?: "transcript").substringBeforeLast('.') + ".txt") },
                     onSearch = { searching = true },
-                    onPrompt = { applyPrompt(it) },
-                    onRevert = { text = original; original = "" },
                 )
             }
         }
@@ -559,18 +508,12 @@ fun TranscribeShareScreen(uris: List<Uri>, onClose: () -> Unit) {
 private fun Footer(
     busy: Boolean,
     twoPerRow: Boolean,
-    prompts: List<PromptModel>,
-    canRevert: Boolean,
-    menuOpen: Boolean,
     copied: Boolean,
-    onMenu: (Boolean) -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
     onRetry: () -> Unit,
     onSave: () -> Unit,
     onSearch: () -> Unit,
-    onPrompt: (PromptModel) -> Unit,
-    onRevert: () -> Unit,
 ) {
     val copy = @Composable { modifier: Modifier ->
         Button(onClick = onCopy, modifier = modifier) {
@@ -597,15 +540,6 @@ private fun Footer(
     val save = @Composable { m: Modifier -> iconButton(Icons.Default.SaveAlt, R.string.dictate__import_save, true, m) { onSave() } }
     val retry = @Composable { m: Modifier -> iconButton(Icons.Default.Refresh, R.string.dictate__import_retry, !busy, m) { onRetry() } }
     val search = @Composable { m: Modifier -> iconButton(Icons.Default.Search, R.string.dictate__import_search, true, m) { onSearch() } }
-    val reword = @Composable { m: Modifier ->
-        Box(m) {
-            iconButton(
-                Icons.Default.AutoFixHigh, R.string.dictate__import_prompt_button,
-                !busy && prompts.isNotEmpty(), Modifier.fillMaxWidth(),
-            ) { onMenu(true) }
-            PromptMenu(menuOpen, prompts, canRevert, onMenu, onPrompt, onRevert)
-        }
-    }
 
     /*
      * Six controls never fit across a phone. The first attempt put them in one row and squeezed the
@@ -614,9 +548,9 @@ private fun Footer(
      * landscape column is narrower still, so there it is two and two and two.
      */
     val rows: List<List<@Composable (Modifier) -> Unit>> = if (twoPerRow) {
-        listOf(listOf(copy, share), listOf(retry, save), listOf(reword, search))
+        listOf(listOf(copy, share), listOf(retry, save), listOf(search))
     } else {
-        listOf(listOf(copy, share, save), listOf(retry, reword, search))
+        listOf(listOf(copy, share, save), listOf(retry, search))
     }
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
@@ -630,34 +564,6 @@ private fun Footer(
     }
 }
 
-/** The prompts, plus the way back out of the last one applied. */
-@Composable
-private fun PromptMenu(
-    open: Boolean,
-    prompts: List<PromptModel>,
-    canRevert: Boolean,
-    onMenu: (Boolean) -> Unit,
-    onPrompt: (PromptModel) -> Unit,
-    onRevert: () -> Unit,
-) {
-    DropdownMenu(expanded = open, onDismissRequest = { onMenu(false) }) {
-        // Undo first and set apart: it is the way back out of the last thing chosen here.
-        if (canRevert) {
-            DropdownMenuItem(
-                text = { Text(stringRes(R.string.dictate__import_revert)) },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null) },
-                onClick = { onMenu(false); onRevert() },
-            )
-            HorizontalDivider()
-        }
-        for (prompt in prompts) {
-            DropdownMenuItem(
-                text = { Text(prompt.name.orEmpty()) },
-                onClick = { onMenu(false); onPrompt(prompt) },
-            )
-        }
-    }
-}
 
 /**
  * The action row, become a search bar.
@@ -870,45 +776,6 @@ private fun LanguageButton(language: String, onPick: (String) -> Unit) {
     }
 }
 
-/** Runs one library prompt over [transcript] using the configured rewording provider. */
-private suspend fun rewordWith(context: Context, promptBody: String, transcript: String): String {
-    val prefs by FlorisPreferenceStore
-    val accounts = prefs.dictate.providerAccounts.get()
-    val account = accounts.getOrEmpty(prefs.dictate.rewordingProviderId.get())
-    val preset = when {
-        account.isCustom -> ProviderRegistry.custom(account.customBaseUrl, realtime = account.customRealtime)
-        else -> ProviderRegistry.byId(account.providerId) ?: ProviderRegistry.OPENAI
-    }
-    val apiKey = account.apiKey.ifBlank {
-        accounts.getOrEmpty(prefs.dictate.transcriptionProviderId.get()).apiKey
-    }
-    if (apiKey.isBlank() && preset.transcriptionApi != TranscriptionApi.LOCAL_ONDEVICE) {
-        throw IllegalStateException(context.getString(R.string.dictate__error_no_api_key))
-    }
-    val client = OpenAiCompatibleClient.from(
-        preset,
-        apiKey,
-        baseUrlOverride = if (account.isCustom || preset.allowsCustomBaseUrl) {
-            account.customBaseUrl.takeIf { it.isNotBlank() }
-        } else null,
-        proxy = prefs.dictate.dictateProxyConfig(),
-        trustUserCerts = account.trustUserCerts,
-        timeoutSeconds = prefs.dictate.requestTimeout.get().toLong(),
-    )
-    val chatModel = chatModelFor(account, preset)
-    return DictateRewording.apply(
-        client = client,
-        chatModel = chatModel,
-        transcript = transcript,
-        // The chosen prompt is the whole job here — no auto-formatting and no auto-apply chain, which
-        // the transcript already went through if the user wanted them.
-        autoFormatting = false,
-        languageName = DictateLanguages.englishNameFor(prefs.dictate.activeInputLanguage.get()),
-        systemPrompt = null,
-        autoApplyPrompts = listOf(DictateRewording.Prompt(promptBody)),
-        reasoningEffort = preset.reasoningEffortWhenOff(chatModel),
-    )
-}
 
 private fun formatDuration(seconds: Long): String {
     val m = seconds / 60
