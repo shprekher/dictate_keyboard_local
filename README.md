@@ -7,6 +7,22 @@ rebuild of Dictate on top of [FlorisBoard](https://github.com/florisboard/floris
 **Speech recognition and cleanup run on the device**, with no cloud inference or API keys.
 An internet connection is needed to download optional models and language data.
 
+## Why this build exists
+
+This fork focuses on everyday English/Russian dictation on a phone, with accuracy and low
+latency as priorities. Recognition and cleanup work offline after the selected models have
+been downloaded, without a provider account, subscription or remote inference server.
+
+The goal is to keep what the speaker said, including names, slang and mixed-language phrases.
+Cleanup is optional and conservative. Unfamiliar words are not automatically treated as errors,
+and personal vocabulary lets users specify preferred spellings without retraining a model.
+Ambiguous number expressions stay as spoken.
+
+The narrower scope keeps the settings focused on dictation and avoids extra rewriting passes.
+Users choose their models, cleanup instruction and memory-retention period. This does not
+guarantee error-free transcription or instant results; performance depends on the phone and
+the selected models.
+
 ## What this fork does
 
 - **On-device dictation** through sherpa-onnx: Parakeet, Whisper, Qwen3-ASR, SenseVoice, GigaAM,
@@ -25,19 +41,19 @@ An internet connection is needed to download optional models and language data.
 - A full typing keyboard inherited from FlorisBoard: layouts, glide typing, autocorrect,
   suggestions, emoji, clipboard, themes.
 
-## What was removed from upstream
+## Differences from upstream
 
-The upstream README describes features this fork does not have. These were cut:
+This Android build omits the following upstream workflows to keep its focus on local dictation:
 
-- Cloud inference and provider accounts (OpenAI, Gemini, Groq, Deepgram, Soniox, ElevenLabs,
-  AssemblyAI, xAI, Anthropic, Mistral, OpenRouter, Azure, Scaleway, OVHcloud and others),
-  self-hosted server configuration, wake-on-demand, and API-key handling.
-- **Dictate Cloud** prepaid-credit backend and all billing/donation/promotional screens.
-- Manual rewording: prompt chips, saved/queued/auto-apply prompts, the prompt library, the
-  prompt panel and live prompts.
-- Spoken editing commands (the trigger word) and the separate AI auto-formatting pass.
+- Cloud and self-hosted inference configuration, provider API keys, and Dictate Cloud billing.
+- Manual rewording, saved/queued/auto-apply prompts, the community prompt library, spoken
+  editing commands and the separate AI auto-formatting pass.
 - Typed snippet expansion from saved prompts.
-- GIF search (KLIPY), Wear OS tethering/keyboard, the add-on store and update checks.
+- GIF search, Wear OS integration, the add-on store, update checks and promotional screens.
+
+Some legacy source modules remain in the repository; their presence does not mean those
+features are available in this Android build. Upstream remains the separate project for its
+broader feature set.
 
 Saved prompt data and legacy preference values stay on disk for backup/recovery but no longer
 participate in dictation. Old prompt-menu links open **Dictate → Cleanup**.
