@@ -41,6 +41,12 @@ fun DictateCleanupScreen() = FlorisScreen {
         val selection by prefs.dictate.cleanupPromptSelection.collectAsState()
         val custom by prefs.dictate.cleanupPromptCustom.collectAsState()
         val default = LocalCleanupPrompt.defaultFor(model)
+        PersonalVocabularyPreference(prefs.dictate.personalVocabulary)
+        SwitchPreference(
+            prefs.dictate.normalizeNumbers,
+            title = stringRes(R.string.dictate__normalize_numbers_title),
+            summary = stringRes(R.string.dictate__normalize_numbers_summary),
+        )
         SwitchPreference(
             prefs.dictate.cleanupEnabled,
             icon = Icons.Default.AutoFixHigh,

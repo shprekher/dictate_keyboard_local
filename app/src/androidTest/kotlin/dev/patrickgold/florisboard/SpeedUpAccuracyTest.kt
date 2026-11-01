@@ -17,8 +17,6 @@ import dev.patrickgold.florisboard.dictate.audio.AudioSpeedUp
 import dev.patrickgold.florisboard.dictate.provider.LocalModelCatalog
 import dev.patrickgold.florisboard.dictate.provider.LocalModelManager
 import dev.patrickgold.florisboard.dictate.provider.LocalTranscriptionProvider
-import dev.patrickgold.florisboard.dictate.provider.OpenAiCompatibleClient
-import dev.patrickgold.florisboard.dictate.provider.ProviderRegistry
 import dev.patrickgold.florisboard.dictate.provider.TranscriptionRequest
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
@@ -31,10 +29,10 @@ import java.io.File
  *
  * Takes the WAVs pushed to [IN_DIR], produces a copy at each rate with the shipping [AudioSpeedUp] code,
  * and transcribes every one of them with an on-device model. The transcripts are logged in a parseable
- * form; the word error rate against the reference text is computed off-device, together with the same
- * runs against a cloud provider (the generated WAVs stay in the app cache to be pulled for that).
+ * form; word error rate against the reference text is computed off-device.
  *
- * Not part of any automated suite: it needs pushed audio, downloads ~670 MB of model, and takes minutes.
+ * Modified by the local fork, November 2026: offline only. Needs pushed audio and an already installed
+ * model. Never downloads a model or sends the audio to a retired cloud provider.
  *
  *   adb shell mkdir -p /data/local/tmp/speedup
  *   adb push en.wav de.wav /data/local/tmp/speedup/
@@ -42,7 +40,7 @@ import java.io.File
  *     -Pandroid.testInstrumentationRunnerArguments.class=dev.patrickgold.florisboard.SpeedUpAccuracyTest \
  *     -Pandroid.testInstrumentationRunnerArguments.speedUpModel=parakeet-tdt-0.6b-v3
  *
- * `speedUpModel=none` only writes the variants (for the cloud half of the measurement) and skips
+ * `speedUpModel=none` only writes the variants and skips
  * everything on-device.
  */
 @RunWith(AndroidJUnit4::class)
@@ -58,8 +56,7 @@ class SpeedUpAccuracyTest {
         assumeTrue("no WAVs pushed to $IN_DIR — skipping", !sources.isNullOrEmpty())
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        // The app's external files dir rather than its cache: `adb shell` can read that one, so the same
-        // variants can be pulled and sent to a cloud provider for the other half of the measurement.
+        // External files allow the user to retrieve variants for offline analysis.
         val outDir = File(context.getExternalFilesDir(null) ?: context.cacheDir, "speedup-out")
             .apply { mkdirs() }
 
@@ -84,35 +81,6 @@ class SpeedUpAccuracyTest {
         }
         assert(variants.isNotEmpty()) { "no variants were produced" }
 
-        // 2a) The cloud half, if a key was pushed next to the audio: the same variants through the same
-        //     client the app uses, so what is measured is the request Dictate actually sends. The key is
-        //     read from the device and never logged.
-        val cloudModel = args.getString("speedUpCloudModel")
-        val keyFile = File(IN_DIR, "groq-key.txt")
-        if (cloudModel != null && keyFile.isFile) {
-            val client = OpenAiCompatibleClient.from(ProviderRegistry.GROQ, keyFile.readText().trim())
-            for ((file, percent) in variants) {
-                // Groq's free tier allows 20 requests a minute, and a measurement that dies two thirds of
-                // the way through is no measurement. One request every few seconds stays under it.
-                Thread.sleep(CLOUD_REQUEST_SPACING_MS)
-                val startedMs = System.currentTimeMillis()
-                val text = runBlocking {
-                    client.transcribe(
-                        TranscriptionRequest(
-                            audioFile = file,
-                            model = cloudModel,
-                            language = languageOf(file.name),
-                        ),
-                    ).text
-                }
-                Log.i(
-                    TAG,
-                    "$LINE|text|groq:$cloudModel|${file.name}|$percent|" +
-                        "${System.currentTimeMillis() - startedMs}ms|${text.replace('\n', ' ').trim()}",
-                )
-            }
-        }
-
         if (modelId == "none") {
             Log.i(TAG, "$LINE|done|variants written to ${outDir.absolutePath}")
             return
@@ -120,18 +88,7 @@ class SpeedUpAccuracyTest {
 
         // 2) The same audio through an on-device model, once per variant.
         val spec = LocalModelCatalog.byId(modelId!!) ?: error("unknown model id: $modelId")
-        if (!LocalModelManager.isInstalled(context, spec.id)) {
-            var lastLogged = -1
-            runBlocking {
-                LocalModelManager.download(context, spec) { done, total ->
-                    val percent = (done * 100 / total).toInt()
-                    if (percent / 10 != lastLogged / 10) {
-                        Log.i(TAG, "$LINE|download|${spec.id}|$percent%")
-                        lastLogged = percent
-                    }
-                }
-            }
-        }
+        assumeTrue("Install the explicitly selected model before this offline benchmark", LocalModelManager.isInstalled(context, spec.id))
         val provider = LocalTranscriptionProvider(LocalTranscriptionProvider.modelDir(context, spec.id))
         for ((file, percent) in variants) {
             val startedMs = System.currentTimeMillis()
@@ -161,8 +118,6 @@ class SpeedUpAccuracyTest {
         const val LINE = "SPEEDUP"
         const val IN_DIR = "/data/local/tmp/speedup"
 
-        /** Slow enough for a 20-requests-per-minute free tier, with room for the request itself. */
-        const val CLOUD_REQUEST_SPACING_MS = 3_500L
         val RATES = listOf(100, 125, 150, 175, 200)
     }
 }

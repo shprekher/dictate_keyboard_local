@@ -69,6 +69,11 @@ object LocalModelPreloader {
                 // Native mapping cannot be interrupted. Keep the lane until it actually finishes,
                 // even if a model switch or pressure signal cancels this preload job.
                 if (textEnabled) withContext(NonCancellable) { LocalCleanupProvider.preload(app, cleanup, instruction) }
+                // Optional preparation only; microphone start never waits for this job.
+                withContext(Dispatchers.IO) {
+                    try { dev.patrickgold.florisboard.dictate.cleanup.VocabularyResources.get(app) }
+                    catch (e: Exception) { Log.w("DictateLatency", "Vocabulary unavailable: ${e.javaClass.simpleName}") }
+                }
             }
         }.also { pending = it }
     }

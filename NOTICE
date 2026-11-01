@@ -3,6 +3,30 @@ Copyright 2024-2026 DevEmperor
 
 This product includes software developed by The FlorisBoard Contributors.
 
+Offline bilingual vocabulary data (local fork, November 2026):
+The bundled vocabulary/words.lex.gz is a modified, indexed union of expanded
+en_US and ru_RU Hunspell word forms and the Danakt Russian lexicon. It is not
+an upstream Hunspell release. Original compressed sources, exact revisions and
+SHA-256 hashes are in tools/vocabulary/sources/ and sources.json.
+
+English en_US: SCOWL, Copyright 2000-2018 Kevin Atkinson and credited contributors;
+affixes derived from Ispell, Copyright 1993 Geoff Kuenning. Distributed under the
+permissions/notices reproduced in app/src/main/assets/vocabulary/en_US-license.txt,
+including SCOWL, WordNet, VarCon and Ispell notices. The unrelated GPL license.txt
+in LibreOffice's en directory is NOT the license selected for these en_US files.
+
+Russian ru_RU: Copyright (c) 1997-2008 Alexander I. Lebedev; modifications credited
+to Laszlo Nemeth in the upstream notice. Redistribution permitted under the terms
+in app/src/main/assets/vocabulary/ru_RU-license.txt, including the non-endorsement
+and modified-version notice requirements.
+
+Russian full-form lexicon: Copyright (c) 2020 Danakt Frost, MIT License.
+https://github.com/danakt/russian-words
+Full permission and disclaimer: app/src/main/assets/vocabulary/danakt-license.txt.
+All three full notice files are also included in APK assets under vocabulary/.
+No Hex source code is included; its preferred-term/sounds-like UX informed the
+independent personal vocabulary design.
+
 ================================================================================
 FlorisBoard
 ================================================================================

@@ -939,6 +939,9 @@ abstract class FlorisPreferenceModel : PreferenceModel() {
             key = "dictate__cleanup_prompt_custom",
             default = "",
         )
+        // Local deterministic refinement. Independent of ASR/model selection and retention choices.
+        val personalVocabulary = string(key = "dictate__personal_vocabulary", default = "")
+        val normalizeNumbers = boolean(key = "dictate__normalize_numbers", default = true)
         // The spoken command word (issue #139): a dictation opening with it runs as a live prompt
         // instead of being inserted. Blank (the default) switches the whole recognition off — there is
         // no word everyone says rarely enough to be a safe default, so the user picks their own.

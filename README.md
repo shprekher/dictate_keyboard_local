@@ -1,3 +1,10 @@
+> **Local fork:** This repository derives from
+> [DevEmperor/DictateKeyboard](https://github.com/DevEmperor/DictateKeyboard), itself based on
+> [FlorisBoard](https://github.com/florisboard/florisboard). This fork uses on-device speech and
+> cleanup, not the upstream cloud/rewording features described in the historical README below.
+> Bilingual vocabulary, personal spellings and deterministic number normalization are documented
+> in [tools/vocabulary/README.md](tools/vocabulary/README.md). See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
 <div align="center">
 
 <img src="img/Icon_512x512_2_round.png" alt="Dictate Keyboard logo" width="120">

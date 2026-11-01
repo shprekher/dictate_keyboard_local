@@ -1,6 +1,21 @@
 DICTATE — THIRD-PARTY DATA & MODEL ATTRIBUTIONS
 ==============================================
 
+LOCAL FORK ADDITION (November 2026): Offline bilingual vocabulary index
+------------------------------------------------------------------------
+vocabulary/words.lex.gz is a modified union of expanded English en_US and
+Russian ru_RU Hunspell word forms and the full-form Danakt Russian lexicon.
+This dictionary data is distinct from the aggregate typing frequencies below.
+English: SCOWL, Copyright 2000-2018 Kevin Atkinson and credited contributors;
+Ispell affixes, Copyright 1993 Geoff Kuenning. Full permissions and disclaimers
+are bundled in vocabulary/en_US-license.txt (SCOWL/WordNet/VarCon/Ispell notices).
+Russian Hunspell: Copyright (c) 1997-2008 Alexander I. Lebedev. Full redistribution
+terms, modifications and disclaimer: vocabulary/ru_RU-license.txt.
+Russian full-form lexicon: Copyright (c) 2020 Danakt Frost, MIT License;
+https://github.com/danakt/russian-words. Full license: vocabulary/danakt-license.txt.
+Source snapshots, hashes and the deterministic index builder are in tools/vocabulary/.
+No dictionaries are downloaded at runtime. Model licenses remain separate.
+
 Dictate bundles and/or downloads language data and neural models from the following
 freely licensed sources. Of the language corpora, only aggregate frequency data (word
 and word-pair counts) is redistributed — never the underlying source texts. Every model

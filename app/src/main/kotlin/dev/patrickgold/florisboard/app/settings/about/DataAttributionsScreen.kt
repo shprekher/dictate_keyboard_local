@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -43,8 +44,13 @@ fun DataAttributionsScreen() = FlorisScreen {
                 .fillMaxSize()
                 .florisVerticalScroll(),
         ) {
-            val text = FlorisRef.assets("license/data_attributions.txt").loadTextAsset(context)
-                .getOrElse { it.message ?: "" }
+            // Local fork, November 2026: show full notices for the bundled derivative dictionaries.
+            val text = remember(context) {
+                listOf("license/data_attributions.txt", "vocabulary/en_US-license.txt",
+                    "vocabulary/ru_RU-license.txt", "vocabulary/danakt-license.txt").joinToString("\n\n") { path ->
+                    FlorisRef.assets(path).loadTextAsset(context).getOrElse { it.message ?: path }
+                }
+            }
             Text(
                 text = text,
                 fontFamily = FontFamily.Monospace,

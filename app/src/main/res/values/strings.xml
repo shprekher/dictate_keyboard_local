@@ -2482,6 +2482,11 @@
     <string name="dictate__rewording_title" comment="Title of the rewording settings screen">Rewording (AI)</string>
     <string name="dictate__local_cleanup_running">Cleaning up on-device…</string>
     <string name="dictate__cleanup_title">Cleanup</string>
+    <string name="dictate__vocabulary_title">Personal vocabulary</string>
+    <string name="dictate__vocabulary_summary">Preferred spellings and exact heard alternatives. Offline; unknown words and slang are not automatically replaced.</string>
+    <string name="dictate__vocabulary_help">One expression per line. Use | before alternatives and ; between them. Example:\nOpenCode | open code; опен код\nкринжовый\nUp to 500 expressions. Exact alternatives authorize replacements, including names, so choose them carefully. Terms are preserved through AI cleanup. Delete a line to remove it. Changes are included in preference backups.</string>
+    <string name="dictate__normalize_numbers_title">Normalize spoken numbers</string>
+    <string name="dictate__normalize_numbers_summary">Convert unambiguous English/Russian numbers, decimals, dates, times, percentages, ordinals and currency amounts to digits. Ambiguous expressions stay unchanged. Works without AI cleanup.</string>
     <string name="dictate__stats_text_passes">AI text passes</string>
     <string name="dictate__models_summary_both">Speech: {transcription} · Cleanup: {cleanup}</string>
     <string name="dictate__cleanup_failed">Cleanup failed; the original transcript was kept.</string>

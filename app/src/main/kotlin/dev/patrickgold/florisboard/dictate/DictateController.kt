@@ -51,6 +51,7 @@ import dev.patrickgold.florisboard.dictate.audio.SpeechGate
 import dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupProvider
 import dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupPipeline
 import dev.patrickgold.florisboard.dictate.cleanup.LocalCleanupPrompt
+import dev.patrickgold.florisboard.dictate.cleanup.VocabularyResources
 import dev.patrickgold.florisboard.dictate.data.prompts.DictatePromptDefaults
 import dev.patrickgold.florisboard.dictate.data.history.DictateHistoryEntry
 import dev.patrickgold.florisboard.dictate.data.history.DictateHistorySource
@@ -3773,8 +3774,32 @@ object DictateController {
      * Runs exactly one cleanup pass. Legacy auto-formatting, saved prompts and spoken commands are
      * intentionally not consulted. Failure retains the original transcript.
      */
-    private suspend fun postProcessTranscript(context: Context, transcript: String): String =
-        LocalCleanupPipeline.automatic(transcript, prefs.dictate.cleanupEnabled.get()) {
+    private suspend fun postProcessTranscript(context: Context, transcript: String): String {
+        if (transcript.length > 100_000) return transcript
+        val personalRaw = prefs.dictate.personalVocabulary.get()
+        val normalizeNumbers = prefs.dictate.normalizeNumbers.get()
+        val cleanupEnabled = prefs.dictate.cleanupEnabled.get()
+        val preparation = withContext(Dispatchers.IO) {
+            val personal = runCatching {
+                dev.patrickgold.florisboard.dictate.vocabulary.PersonalVocabulary.parse(personalRaw)
+            }.getOrElse { dev.patrickgold.florisboard.dictate.vocabulary.PersonalVocabulary(emptyList()) }
+            val corrector = try { VocabularyResources.get(context) } catch (_: Exception) {
+                // A missing/corrupt index must not lose speech, disable personal terms or require network.
+                dev.patrickgold.florisboard.dictate.vocabulary.VocabularyCorrector(
+                    dev.patrickgold.florisboard.dictate.vocabulary.Lexicon { false },
+                )
+            }
+            personal to corrector
+        }
+        return withContext(Dispatchers.Default) {
+            dev.patrickgold.florisboard.dictate.vocabulary.TranscriptRefinement.refine(
+                transcript, preparation.first, preparation.second, normalizeNumbers,
+            ) { source -> cleanupTranscript(context, source, cleanupEnabled) }
+        }
+    }
+
+    private suspend fun cleanupTranscript(context: Context, transcript: String, enabled: Boolean): String =
+        LocalCleanupPipeline.automatic(transcript, enabled) {
             _state.value = UiState.Rewording(context.getString(R.string.dictate__local_cleanup_running))
             cleanupOrKeep(transcript) {
                 LocalCleanupProvider.complete(

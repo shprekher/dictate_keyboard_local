@@ -2535,4 +2535,10 @@
     <string name="translate__missing">Не скачано: {language}</string>
     <string name="translate__failed">Не удалось перевести</string>
     <string name="translate__unsupported">Перевод недоступен на этом устройстве</string>
+    <!-- Added by the local fork, November 2026. -->
+    <string name="dictate__vocabulary_title">Личный словарь</string>
+    <string name="dictate__vocabulary_summary">Предпочтительные написания и точные варианты распознавания. Без интернета; незнакомые слова и сленг не заменяются автоматически.</string>
+    <string name="dictate__vocabulary_help">По одному выражению на строку. После | укажите варианты распознавания, разделяя их знаком ;. Пример:\nOpenCode | open code; опен код\nкринжовый\nНе более 500 выражений. Точные варианты разрешают замену, в том числе имён, поэтому выбирайте их внимательно. Слова сохраняются при очистке ИИ. Чтобы удалить запись, удалите строку. Изменения входят в резервную копию настроек.</string>
+    <string name="dictate__normalize_numbers_title">Преобразовывать числа в цифры</string>
+    <string name="dictate__normalize_numbers_summary">Однозначные русские и английские числительные, дроби, даты, время, проценты, порядковые числительные и денежные суммы. Неоднозначные выражения остаются без изменений. Работает без очистки ИИ.</string>
 </resources>
