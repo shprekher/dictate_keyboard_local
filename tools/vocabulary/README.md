@@ -89,15 +89,41 @@ final insertion stage, as before; these are explicit user transformations outsid
   known hesitation sounds and immediate nonnumeric/nonnegative repetition removal. A rejection
   retains the pre-Qwen text. Thus some legitimate grammatical corrections will also be rejected.
   It is a lexical safeguard, **not proof that punctuation cannot change meaning**.
-* Number normalization has its own visible switch and works with Qwen off. It recognizes
-  strictly composed English/Russian cardinals/scales, negative values, digit-by-digit decimals,
-  Russian целых + десятых/сотых/тысячных, explicit percentages, currency/measurement amounts,
-  supported ordinals, day + named month and cue + hour + tens/minutes.
-  Examples: `twenty five percent` -> `25%`; `ноль целых пять сотых` -> `0,05`;
-  `в девять сорок пять` -> `в 9:45`; `пятое мая` -> `5 мая`.
-  Currency names stay as spoken; no guessed currency symbol, year, locale date order, AM/PM,
-  time zone, telephone grouping or arithmetic. Isolated ambiguous numbers/ordinals, unsupported
-  fractions, malformed sequences, numeric identifiers, quotes and URLs are retained.
+* Number normalization has its own visible switch and works with Qwen off. It is a tokenizer
+  plus a strict grammar, not a list of regex exceptions. Spoken quantities up to **9999** become
+  digits; quantities from **10000** stay in words: `две тысячи пятьсот` -> `2500`, but
+  `десять тысяч`, `двадцать пять тысяч рублей` and `миллион долларов` are unchanged.
+  `тысячи людей`/`миллионы причин` are plural nouns, not exact quantities, and stay in words.
+  Decimals, phones, addresses, dates, times, codes and already-written digits are always digits.
+* ASR punctuation inside one number is tolerated when it belongs to a spoken decimal marker:
+  `274, точка 15` -> `274.15`, `13, запятая 14` -> `13,14`. A comma between two independent
+  numbers is not crossed (`13, 14` stays a list). A formatted decimal is a complete token and
+  is never merged with the next number (`67.0 274.15` stays two measurements).
+* The separator follows the spoken word: `точка`/`point` -> `.`, `запятая` -> `,`,
+  `целых`/`целая` -> `,`. Supported: digit-by-digit fractions, Russian
+  `целых` + `десятых/сотых/тысячных/десятитысячных`, `два и семь сотых`, unprefixed
+  `семь десятых` -> `0,7`, and `X с половиной` -> `X,5` (`шестнадцать с половиной` -> `16,5`).
+  An unfinished `две целых пять` is left alone.
+  A literal `дробь` between two numbers becomes `/` (`8 дробь 016` -> `8/016`); no ASR
+  homophone is guessed.
+* An isolated `запятая` in dictation becomes a comma (`я думаю запятая что да` ->
+  `я думаю, что да`), never a surviving word. Quoted text and explicit discussion
+  (`слово запятая`, `здесь нужна запятая`) are preserved. `точка` outside a number is
+  left as a word (`точка зрения`).
+* Also recognized: strictly composed English/Russian cardinals/scales, Russian oblique case
+  forms of 2–30 and the teens (`около шестнадцати` -> `около 16`), negative values,
+  explicit percentages, currency/measurement amounts, supported ordinals, day + named month
+  and cue + hour + tens/minutes. The 1-forms (`одного`/`одной`…), `сорок` (also "magpie"),
+  50–80 and the hundreds stay as words in oblique cases to avoid prose false positives.
+  Examples: `twenty five percent` -> `25%`;
+  `ноль целых пять сотых` -> `0,05`; `в девять сорок пять` -> `в 9:45`;
+  `пятое мая` -> `5 мая`. Currency names stay as spoken; no guessed currency symbol, year,
+  locale date order, AM/PM, time zone or arithmetic. Address labels can take a single digit
+  (`строение один` -> `строение 1`). Consecutive dictated digits also work without a cue
+  (`0 пять 2` -> `052`). Phone digits and spoken cardinal groups are joined without formatting;
+  an explicit `+` and leading zeroes are retained, and a domestic `8` is never rewritten as `+7`.
+  Isolated ambiguous numbers/ordinals, unsupported fractions, malformed sequences, numeric
+  identifiers, quotes and URLs are retained.
 * The final guard compares normalized output with deterministic normalization of the safe
   pre-Qwen source. Exceptions preserve safe source text; cancellation propagates. Inputs over
   100,000 characters bypass refinement to bound work.
